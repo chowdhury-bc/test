@@ -1,5 +1,13 @@
+#!/bin/bash
+
+# Function to convert UTC to EST timestamp
+convert_to_est() {
+    local utc_time="$1"
+    # Convert UTC to EST using TZ environment variable
+    TZ="America/New_York" date -d "$utc_time" "+%Y-%m-%d %H:%M:%S %Z"
+}
+
 # Check that $DOWNLOAD_DIR is not empty and it points to a valid directory
-# Ensure the DOWNLOAD_DIR is set and valid
 if [ -z "$DOWNLOAD_DIR" ]; then
     echo "Error: DOWNLOAD_DIR is not set."
     exit 1
@@ -27,40 +35,48 @@ latest_file_info=$(/usr/local/bin/aws s3api list-objects-v2 \
 
 # Extract the key and last modified timestamp
 key=$(echo "$latest_file_info" | jq -r '.Key')
-timestamp=$(echo "$latest_file_info" | jq -r '.LastModified')
+s3_timestamp_utc=$(echo "$latest_file_info" | jq -r '.LastModified')
 
+# Convert timestamps to EST
+s3_timestamp_est=$(convert_to_est "$s3_timestamp_utc")
+current_time_est=$(TZ="America/New_York" date "+%Y-%m-%d %H:%M:%S %Z")
 
-# Get the current system time (Linux time) in ISO 8601 format
-linux_timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+# Get timestamps in Unix format for comparison
+s3_unix_timestamp=$(TZ="America/New_York" date -d "$s3_timestamp_utc" +%s)
+current_unix_timestamp=$(TZ="America/New_York" date +%s)
 
-# Debugging: Log the raw S3 and Linux timestamps for verification
-echo "Latest file key: $key"
-echo "S3 Last modified time: $s3_timestamp"
-echo "Current Linux time: $linux_timestamp"
+# Calculate the time difference in minutes
+time_difference_minutes=$(( (current_unix_timestamp - s3_unix_timestamp) / 60 ))
+
+# Print detailed timestamp information
+echo "============== Timestamp Information =============="
+echo "File: $key"
+echo "S3 Upload Time (UTC): $s3_timestamp_utc"
+echo "S3 Upload Time (EST): $s3_timestamp_est"
+echo "Current Time (EST): $current_time_est"
+echo "Time since upload: $time_difference_minutes minutes"
+echo "==============================================="
 
 # Read the last processed timestamp to avoid reprocessing the same file
 if [ -f "$LAST_TIMESTAMP_FILE" ]; then
     last_timestamp=$(cat "$LAST_TIMESTAMP_FILE")
-else
-    last_timestamp=""
+    last_timestamp_est=$(convert_to_est "$last_timestamp")
+    echo "Last processed time (EST): $last_timestamp_est"
+    
+    last_unix_timestamp=$(TZ="America/New_York" date -d "$last_timestamp" +%s)
+    
+    # Compare timestamps with a small buffer (e.g., 1 minute) to account for precision differences
+    if [ $((s3_unix_timestamp - last_unix_timestamp)) -le 60 ]; then
+        echo "No new file to process. Exiting."
+        exit 0
+    fi
 fi
 
-# Compare the latest S3 timestamp with the last processed one
-#if [ "$s3_timestamp" = "$last_timestamp" ]; then
- #   echo "No new file to process. Exiting."
-  #  exit 0
-#fi
-
-
-
-
 # Check if the key was retrieved
-if [ -z "$key" ] || [ "$key" == "None" ]; then
+if [ -z "$key" ] || [ "$key" == "null" ]; then
     echo "Error: No valid key found."
     exit 1
 fi
-
-
 
 # Download the latest file to the download directory
 /usr/local/bin/aws s3 cp "s3://$BUCKET_NAME/$key" "$DOWNLOAD_DIR"
@@ -69,53 +85,43 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Create a timestamp log with EST times
+timestamp_log="$DOWNLOAD_DIR/timestamp_log.txt"
+echo "File: $(basename $key)" > "$timestamp_log"
+echo "Upload Time (EST): $s3_timestamp_est" >> "$timestamp_log"
+echo "Processing Time (EST): $current_time_est" >> "$timestamp_log"
+
 # Log the downloaded file path and its timestamp for the inference script
-echo "$DOWNLOAD_DIR/$(basename $key) $s3_timestamp $linux_timestamp" > files_to_download.txt
+echo "$DOWNLOAD_DIR/$(basename $key) $s3_timestamp_est $current_time_est" > files_to_download.txt
+
 # Save the latest S3 timestamp to prevent reprocessing the same file in the future
-echo "$s3_timestamp" > "$LAST_TIMESTAMP_FILE"
+echo "$s3_timestamp_utc" > "$LAST_TIMESTAMP_FILE"
 
-echo "Latest file downloaded success: $key"
+echo "Latest file downloaded successfully: $key"
 
-
-
-
-
-
-# Run the Python script
-# python3 /var/snap/amazon-ssm-agent/7993/script.py --input_img_size 600 --batch_size 1 --model_path "./trained_models/*" --local_dir  $DOWNLOAD_DIR --bucket_name $BUCKET_NAME --input_s3_prefix $PREFIX
-# python3 script.py --model_path ./trained_models/* --image_path "$DOWNLOAD_DIR"
+# Run the Python script for inference
 /usr/bin/python3 /var/snap/amazon-ssm-agent/7993/infer.py --input_img_size 600 --model_path /var/snap/amazon-ssm-agent/7993/trained_models/* --image_path  $DOWNLOAD_DIR
 
+# After inference, log the completion time
+completion_time_est=$(TZ="America/New_York" date "+%Y-%m-%d %H:%M:%S %Z")
+echo "Inference Completion Time (EST): $completion_time_est" >> "$timestamp_log"
 
-#append to csv
-# First, append the header only if the predictions.csv file does not exist
-#if [ ! -f /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv]; then
- #   head -n 1 /var/snap/amazon-ssm-agent/7993/inference_predictions.csv > /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv
-#fi
-
-# Then, append the data from inference_predictions.csv, skipping the header
+# Append to predictions.csv
 tail -n +2 /var/snap/amazon-ssm-agent/7993/inference_predictions.csv >> /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv
-#cat /var/snap/amazon-ssm-agent/7993/inference_predictions.csv >> /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv
 
-
-# copy predictions to s3
+# Copy predictions to s3
 /usr/local/bin/aws s3 cp /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv s3://rise-collab/
 
+# Log final completion
+echo "============== Process Complete =============="
+echo "Final completion time (EST): $completion_time_est"
+echo "Total processing time: $(( ($(TZ="America/New_York" date +%s) - s3_unix_timestamp) / 60 )) minutes"
+echo "==========================================="
 
-# Check the exit status of your main script
+# Check the exit status
 if [ $? -eq 0 ]; then
-  echo "Main script executed successfully."
-  # If files were found before running the main script, delete them
-  if [ "$FILE_EXISTS" = true ]; then
-    echo "Deleting files in $DOWNLOAD_DIR."
-   # rm -f $DOWNLOAD_DIR/*
-    echo "Files deleted."
-  fi
+    echo "Script executed successfully at: $completion_time_est (EST)"
 else
-  echo "Main script encountered an error."
-  exit 1
+    echo "Script encountered an error at: $completion_time_est (EST)"
+    exit 1
 fi
-
-# Optionally, you can include additional cleanup or logging here
-
-echo "Script execution completed."

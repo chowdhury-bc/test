@@ -1,0 +1,121 @@
+# Check that $DOWNLOAD_DIR is not empty and it points to a valid directory
+# Ensure the DOWNLOAD_DIR is set and valid
+if [ -z "$DOWNLOAD_DIR" ]; then
+    echo "Error: DOWNLOAD_DIR is not set."
+    exit 1
+elif [ ! -d "$DOWNLOAD_DIR" ]; then
+    echo "DOWNLOAD_DIR does not exist. Creating the directory..."
+    mkdir -p "$DOWNLOAD_DIR"
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to create DOWNLOAD_DIR."
+        exit 1
+    fi
+fi
+
+# Clean up download directory by removing all files
+rm -rf "$DOWNLOAD_DIR"/*
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to clean up DOWNLOAD_DIR."
+    exit 1
+fi
+
+# Get the latest object from S3
+latest_file_info=$(/usr/local/bin/aws s3api list-objects-v2 \
+    --bucket $BUCKET_NAME --prefix $PREFIX \
+    --query 'Contents | sort_by(@, &LastModified)[-1].{Key: Key, LastModified: LastModified}' \
+    --output json)
+
+# Extract the key and last modified timestamp
+key=$(echo "$latest_file_info" | jq -r '.Key')
+timestamp=$(echo "$latest_file_info" | jq -r '.LastModified')
+
+
+# Get the current system time (Linux time) in ISO 8601 format
+linux_timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+
+# Debugging: Log the raw S3 and Linux timestamps for verification
+echo "Latest file key: $key"
+echo "S3 Last modified time: $s3_timestamp"
+echo "Current Linux time: $linux_timestamp"
+
+# Read the last processed timestamp to avoid reprocessing the same file
+if [ -f "$LAST_TIMESTAMP_FILE" ]; then
+    last_timestamp=$(cat "$LAST_TIMESTAMP_FILE")
+else
+    last_timestamp=""
+fi
+
+# Compare the latest S3 timestamp with the last processed one
+#if [ "$s3_timestamp" = "$last_timestamp" ]; then
+ #   echo "No new file to process. Exiting."
+  #  exit 0
+#fi
+
+
+
+
+# Check if the key was retrieved
+if [ -z "$key" ] || [ "$key" == "None" ]; then
+    echo "Error: No valid key found."
+    exit 1
+fi
+
+
+
+# Download the latest file to the download directory
+/usr/local/bin/aws s3 cp "s3://$BUCKET_NAME/$key" "$DOWNLOAD_DIR"
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to download the latest file from S3."
+    exit 1
+fi
+
+# Log the downloaded file path and its timestamp for the inference script
+echo "$DOWNLOAD_DIR/$(basename $key) $s3_timestamp $linux_timestamp" > files_to_download.txt
+# Save the latest S3 timestamp to prevent reprocessing the same file in the future
+echo "$s3_timestamp" > "$LAST_TIMESTAMP_FILE"
+
+echo "Latest file downloaded success: $key"
+
+
+
+
+
+
+# Run the Python script
+# python3 /var/snap/amazon-ssm-agent/7993/script.py --input_img_size 600 --batch_size 1 --model_path "./trained_models/*" --local_dir  $DOWNLOAD_DIR --bucket_name $BUCKET_NAME --input_s3_prefix $PREFIX
+# python3 script.py --model_path ./trained_models/* --image_path "$DOWNLOAD_DIR"
+/usr/bin/python3 /var/snap/amazon-ssm-agent/7993/infer.py --input_img_size 600 --model_path /var/snap/amazon-ssm-agent/7993/trained_models/* --image_path  $DOWNLOAD_DIR
+
+
+#append to csv
+# First, append the header only if the predictions.csv file does not exist
+#if [ ! -f /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv]; then
+ #   head -n 1 /var/snap/amazon-ssm-agent/7993/inference_predictions.csv > /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv
+#fi
+
+# Then, append the data from inference_predictions.csv, skipping the header
+tail -n +2 /var/snap/amazon-ssm-agent/7993/inference_predictions.csv >> /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv
+#cat /var/snap/amazon-ssm-agent/7993/inference_predictions.csv >> /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv
+
+
+# copy predictions to s3
+/usr/local/bin/aws s3 cp /var/snap/amazon-ssm-agent/7993/testpredictions/predictions.csv s3://rise-collab/
+
+
+# Check the exit status of your main script
+if [ $? -eq 0 ]; then
+  echo "Main script executed successfully."
+  # If files were found before running the main script, delete them
+  if [ "$FILE_EXISTS" = true ]; then
+    echo "Deleting files in $DOWNLOAD_DIR."
+   # rm -f $DOWNLOAD_DIR/*
+    echo "Files deleted."
+  fi
+else
+  echo "Main script encountered an error."
+  exit 1
+fi
+
+# Optionally, you can include additional cleanup or logging here
+
+echo "Script execution completed."

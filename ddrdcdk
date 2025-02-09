@@ -1,0 +1,104 @@
+from aws_cdk import Stack, aws_iam as _iam, aws_lambda as _lambda, aws_cognito as _cognito
+import aws_cdk as _cdk
+import os
+from constructs import Construct
+
+class ApiGw_Stack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        env_name = self.node.try_get_context("environment_name")
+        env_params = self.node.try_get_context(env_name)
+        region = os.getenv('CDK_DEFAULT_REGION')
+
+        # Cognito
+        user_pool = _cognito.UserPool(self, f"rag-llm-user-pool-{env_name}",
+            user_pool_name=env_params['rag-llm-user-pool'],
+            self_sign_up_enabled=True,
+            sign_in_aliases=_cognito.SignInAliases(email=True),
+            standard_attributes=_cognito.StandardAttributes(
+                email=_cognito.StandardAttribute(required=True, mutable=True)
+            ),
+            password_policy=_cognito.PasswordPolicy(
+                min_length=8,
+                require_digits=True,
+                require_lowercase=True,
+                require_uppercase=True,
+                require_symbols=True
+            )
+        )
+
+        user_pool_client = _cognito.UserPoolClient(self, f"rag-llm-user-pool-client-{env_name}",
+            user_pool=user_pool,
+            generate_secret=False,
+            auth_flows=_cognito.AuthFlow(user_password=True, user_srp=True),
+            id_token_validity=_cdk.Duration.days(1)
+        )
+
+        # Lambda References
+        html_lambda = _lambda.Function.from_function_name(
+            self, 'html-lambda', 'llm_rag_html'
+        )
+        
+        query_lambda = _lambda.Function.from_function_name(
+            self, 'query-lambda', 'bedrock_rag_query_dev'
+        )
+
+        # WebSocket API
+        websocket_api = _cdk.aws_apigatewayv2.CfnApi(self, f'bedrock-streaming-response-{env_name}',
+            protocol_type='WEBSOCKET',
+            name=f'Bedrock-streaming-{env_name}',
+            route_selection_expression='$request.body.action'
+        )
+
+        apigw_role = _iam.Role(self, f'bedrock-lambda-invoke-{env_name}',
+            assumed_by=_iam.ServicePrincipal('apigateway.amazonaws.com')
+        )
+        
+        apigw_role.add_to_policy(_iam.PolicyStatement(
+            effect=_iam.Effect.ALLOW,
+            actions=["lambda:InvokeFunction"],
+            resources=[query_lambda.function_arn]
+        ))
+
+        websocket_integration = _cdk.aws_apigatewayv2.CfnIntegration(self, f'bedrock-websocket-integration-{env_name}',
+            api_id=websocket_api.ref,
+            integration_type="AWS_PROXY",
+            integration_uri=f"arn:aws:apigateway:{region}:lambda:path/2015-03-31/functions/{query_lambda.function_arn}/invocations",
+            credentials_arn=apigw_role.role_arn
+        )
+
+        # WebSocket Routes
+        for route_key in ['$connect', '$disconnect', '$default', 'bedrock']:
+            _cdk.aws_apigatewayv2.CfnRoute(self, f'bedrock-{route_key}-route-{env_name}',
+                api_id=websocket_api.ref,
+                route_key=route_key,
+                authorization_type="NONE", 
+                target=f"integrations/{websocket_integration.ref}"
+            )
+
+        # Deploy WebSocket API
+        deployment = _cdk.aws_apigatewayv2.CfnDeployment(self, f'bedrock-streaming-deploy-{env_name}',
+            api_id=websocket_api.ref
+        )
+
+        _cdk.aws_apigatewayv2.CfnStage(self, f'bedrock-streaming-stage-{env_name}',
+            api_id=websocket_api.ref,
+            auto_deploy=True,
+            deployment_id=deployment.ref,
+            stage_name=env_name
+        )
+
+        # REST API
+        rest_api = _cdk.aws_apigateway.RestApi(self, f"rag-llm-api-{env_name}",
+            deploy=True,
+            endpoint_types=[_cdk.aws_apigateway.EndpointType.REGIONAL]
+        )
+
+        # REST API Integration
+        html_integration = _cdk.aws_apigateway.LambdaIntegration(html_lambda)
+        api_resource = rest_api.root.add_resource('rag')
+        api_resource.add_method('GET', html_integration)
+
+        # Outputs
+        _cdk.CfnOutput(self, "UserPoolId", value=user_pool.user_pool_id)
+        _cdk.CfnOutput(self, "UserPoolClientId", value=user_pool_client.user_pool_client_id)

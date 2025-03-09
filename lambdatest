@@ -1,0 +1,219 @@
+// Replace line 276 in chat-ui-input-panel.tsx with this:
+ws.onmessage = (event) => {
+  try {
+    // First check if the data can be parsed directly
+    const rawData = event.data;
+    let parsedData;
+    
+    if (rawData.includes('message')) {
+      parsedData = JSON.parse(rawData);
+      if (parsedData['message'] && parsedData['message'].includes('Endpoint')) {
+        parsedData['message'] = 'Hang in there';
+      }
+      props.onSendMessage?.(parsedData['message'], ChatMessageType.AI);
+    } else {
+      // Try to decode as base64 and then parse
+      try {
+        parsedData = JSON.parse(atob(rawData));
+        if ('text' in parsedData) {
+          msgs = msgs ? msgs + parsedData['text'] : parsedData['text'];
+          
+          if (msgs.endsWith('ack-end-of-msg')) {
+            msgs = msgs.replace('ack-end-of-msg', '');
+            setTimeout(() => {
+              setDisabled(false);
+            }, 3000);
+          }
+          props.onSendMessage?.(msgs, ChatMessageType.AI);
+        } else {
+          // Display errors
+          props.onSendMessage?.(JSON.stringify(parsedData), ChatMessageType.AI);
+          setDisabled(false);
+        }
+      } catch (base64Error) {
+        console.error("Failed to parse base64 data:", base64Error);
+        props.onSendMessage?.("Error parsing response from server", ChatMessageType.AI);
+        setDisabled(false);
+      }
+    }
+  } catch (error) {
+    console.error("WebSocket message error:", error);
+    props.onSendMessage?.("Error processing server response", ChatMessageType.AI);
+    setDisabled(false);
+  }
+};
+
+
+
+
+
+
+
+========
+lambda 
+
+
+# Add these functions to your existing lambda
+
+# Initialize OpenSearch client with proper error handling
+def initialize_opensearch_client():
+    try:
+        client = OpenSearch(
+            hosts=[endpoint],
+            http_auth=awsauth,
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection,
+            timeout=300
+        )
+        # Test connection
+        health = client.cluster.health()
+        LOG.info(f"OpenSearch connection successful: {health}")
+        return client
+    except Exception as e:
+        LOG.error(f"Failed to initialize OpenSearch: {str(e)}")
+        return None
+
+# Debug function for RAG data fetching
+def debug_rag_fetch(query, connect_id):
+    """Debug function to trace RAG data fetching"""
+    websocket_send(connect_id, {"text": "Attempting to fetch data from OpenSearch..."})
+    try:
+        # Try initializing OpenSearch
+        client = initialize_opensearch_client()
+        if not client:
+            websocket_send(connect_id, {"text": "Failed to connect to OpenSearch"})
+            return None
+            
+        # Basic query to test
+        search_response = client.search(
+            index=INDEX_NAME,
+            body={
+                "query": {
+                    "match": {
+                        "text": query
+                    }
+                },
+                "size": 3
+            }
+        )
+        
+        # Check results
+        if 'hits' in search_response and 'hits' in search_response['hits']:
+            hits = search_response['hits']['hits']
+            if hits:
+                websocket_send(connect_id, {"text": f"Found {len(hits)} relevant documents"})
+                return search_response
+            else:
+                websocket_send(connect_id, {"text": "No matching documents found"})
+                return None
+        else:
+            websocket_send(connect_id, {"text": "Unexpected response format from OpenSearch"})
+            return None
+    except Exception as e:
+        websocket_send(connect_id, {"text": f"Error during RAG fetch: {str(e)}"})
+        return None
+
+# Modify the handler to correctly route RAG requests
+def handler(event, context):
+    global region
+    global websocket_client
+    LOG.info("--- Amazon Opensearch Serverless vector db with Amazon Bedrock Models ---")
+    LOG.info(f'event - {event}')
+
+    if 'httpMethod' not in event and 'requestContext' in event:
+        # WebSocket request processing
+        stage = event['requestContext']['stage']
+        api_id = event['requestContext']['apiId']
+        domain = f'{api_id}.execute-api.{region}.amazonaws.com'
+        websocket_client = boto3.client('apigatewaymanagementapi', endpoint_url=f'https://{domain}/{stage}')
+
+        connect_id = event['requestContext']['connectionId']
+        routeKey = event['requestContext']['routeKey']
+
+        if routeKey != '$connect':
+            if 'body' in event:
+                try:
+                    input_to_llm = json.loads(event['body'], strict=False)
+                    LOG.info(f'input_to_llm: {input_to_llm}')
+                    query = input_to_llm['query']
+                    language = input_to_llm.get('language', 'english')
+                    behaviour = input_to_llm['behaviour']
+                    
+                    # Handle advanced RAG agent behavior
+                    if behaviour == 'advanced-rag-agent':
+                        query_vector_db = input_to_llm.get('query_vectordb', 'no')
+                        is_hybrid_search = input_to_llm.get('is_hybrid_search', 'no') == 'yes'
+                        model_id = input_to_llm.get('model_id', 'anthropic.claude-3-sonnet-20240229-v1:0')
+                        
+                        # Debug RAG connection if requested
+                        if query_vector_db == 'debug':
+                            websocket_send(connect_id, {"text": "Starting RAG connection debug..."})
+                            last_user_query = ""
+                            # Extract the last user query
+                            try:
+                                query_json = json.loads(query)
+                                for item in reversed(query_json):
+                                    if item.get('role') == 'user':
+                                        for content_item in item.get('content', []):
+                                            if content_item.get('type') == 'text':
+                                                last_user_query = content_item.get('text', "")
+                                                break
+                                        if last_user_query:
+                                            break
+                            except Exception as e:
+                                LOG.error(f"Error extracting query: {str(e)}")
+                            
+                            debug_result = debug_rag_fetch(last_user_query, connect_id)
+                            websocket_send(connect_id, {"text": "RAG debug completed"})
+                            websocket_send(connect_id, {"text": "ack-end-of-msg"})
+                        else:
+                            # Regular RAG query
+                            query_rag_no_agent(query, query_vector_db, language, model_id, is_hybrid_search, connect_id)
+                    # Original behaviors from your lambda
+                    elif behaviour == 'advanced-agent':
+                        query_agents(behaviour, query, connect_id)
+                    elif behaviour == 'sentiment':
+                        model_id = input_to_llm['model_id']
+                        query_sentiment(query, model_id, connect_id)
+                    elif behaviour == 'ocr':
+                        model_id = input_to_llm['model_id']
+                        perform_ocr(query, model_id, connect_id)
+                    elif behaviour == 'pii':
+                        model_id = input_to_llm['model_id']
+                        pii_redact(query, model_id, connect_id)
+                    else:
+                        query_vector_db = 'no'
+                        if 'query_vectordb' in input_to_llm and input_to_llm['query_vectordb']=='yes':
+                            query_vector_db='yes' 
+                        if 'model_id' in input_to_llm:
+                            model_id = input_to_llm['model_id']
+                        is_hybrid_search = False
+                        if 'is_hybrid_search' in input_to_llm and input_to_llm['is_hybrid_search'] == 'yes':
+                            is_hybrid_search = True
+                        query_rag_no_agent(query, query_vector_db, language, model_id, is_hybrid_search, connect_id)
+                except Exception as e:
+                    LOG.error(f"Error processing WebSocket request: {str(e)}")
+                    websocket_send(connect_id, {"text": f"Error processing request: {str(e)}"})
+                    websocket_send(connect_id, {"text": "ack-end-of-msg"})
+        elif routeKey == '$connect':
+            # Connection validation logic
+            if 'queryStringParameters' in event and 'access_token' in event['queryStringParameters']:
+                headers = {'Content-Type': 'application/json', 'Authorization': event['queryStringParameters']['access_token']}
+                try:
+                    response = requests.get(f'{rest_api_url}connect-tracker', headers=headers, verify=False)
+                    if response.status_code == 200:
+                        return {'statusCode': 200, 'body': 'Connection established'}
+                    else:
+                        LOG.error(f'Auth error: {response.status_code}, reason: {response.reason}')
+                        return {'statusCode': response.status_code, 'body': f'Forbidden: {response.reason}'}
+                except Exception as e:
+                    LOG.error(f"Error validating connection: {str(e)}")
+                    return {'statusCode': 500, 'body': 'Internal server error'}
+            return {'statusCode': 400, 'body': 'Invalid connection request'}
+    # Rest of your original handler for non-WebSocket requests
+    elif 'httpMethod' in event:
+        # Your existing API handling code
+        pass
+
+    return {'statusCode': 200, 'body': 'Bedrock says hello'}

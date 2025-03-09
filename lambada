@@ -1,3 +1,39 @@
+def websocket_send(connect_id, message):
+    try:
+        # Ensure message is serializable
+        if isinstance(message, str):
+            message = {"text": message}
+        
+        # Convert to JSON string and encode as UTF-8
+        data = json.dumps(message).encode('utf-8')
+        
+        # Send without base64 encoding
+        websocket_client.post_to_connection(
+            Data=data,
+            ConnectionId=connect_id
+        )
+    except Exception as e:
+        LOG.error(f"Error sending WebSocket message: {str(e)}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import boto3
 from os import getenv
 from opensearchpy import OpenSearch, RequestsHttpConnection, exceptions

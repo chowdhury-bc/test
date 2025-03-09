@@ -1,5 +1,23 @@
 def websocket_send(connect_id, message):
     try:
+        # For text chunks, format properly for the UI
+        if isinstance(message, dict) and "text" in message:
+            data = json.dumps(message).encode('utf-8')
+        else:
+            # For other messages, base64 encode as expected by client
+            data = base64.b64encode(json.dumps(message).encode('utf-8'))
+        
+        websocket_client.post_to_connection(
+            Data=data,
+            ConnectionId=connect_id
+        )
+    except Exception as e:
+        LOG.error(f"WebSocket error: {str(e)}")
+
+
+
+def websocket_send(connect_id, message):
+    try:
         # Ensure message is serializable
         if isinstance(message, str):
             message = {"text": message}

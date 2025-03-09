@@ -1,3 +1,12 @@
+chat-ui-input-panel.tsx:300 Failed to parse message: SyntaxError: Unexpected token '', "çk¡É,k+!zYh" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at ws.onmessage (chat-ui-input-panel.tsx:279:32) Bedrock says hello
+ws.onmessage	@	chat-ui-input-panel.tsx:300
+
+﻿
+
+
+
 ws.onmessage = (event) => {
   try {
     if (event.data.includes('message')) {

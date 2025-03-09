@@ -1,3 +1,56 @@
+ws.onmessage = (event) => {
+  try {
+    if (event.data.includes('message')) {
+      var evt_json = JSON.parse(event.data);
+      if (evt_json['message'].includes('Endpoint')) {
+        evt_json['message'] = 'Hang in there'
+      }
+      props.onSendMessage?.(evt_json['message'], ChatMessageType.AI);
+    }
+    else {
+      try {
+        var chat_output = JSON.parse(atob(event.data));
+        if ('text' in chat_output) {
+          if (msgs) {
+            msgs += chat_output['text'];
+          } else {
+            msgs = chat_output['text'];
+          }
+
+          if (msgs.endsWith('ack-end-of-msg')) {
+            msgs = msgs.replace('ack-end-of-msg', '');
+            setTimeout(()=> {
+              setDisabled(false);
+            },3000);
+          }
+          props.onSendMessage?.(msgs, ChatMessageType.AI);
+        } else {
+          // Display errors
+          props.onSendMessage?.(JSON.stringify(chat_output), ChatMessageType.AI);
+          setDisabled(false);
+        }
+      } catch (base64Error) {
+        console.error("Failed to parse message:", base64Error, event.data);
+        props.onSendMessage?.("Error processing response", ChatMessageType.AI);
+        setDisabled(false);
+      }
+    }
+  } catch (error) {
+    console.error("WebSocket message error:", error);
+    setDisabled(false);
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
 // Replace line 276 in chat-ui-input-panel.tsx with this:
 ws.onmessage = (event) => {
   try {

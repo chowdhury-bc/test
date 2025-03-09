@@ -1,3 +1,100 @@
+
+ws.onmessage = (event) => {
+  try {
+    // Check if the data is a string and includes 'message'
+    if (typeof event.data === 'string' && event.data.includes('message')) {
+      var evt_json = JSON.parse(event.data);
+      if (evt_json['message'].includes('Endpoint')) {
+        evt_json['message'] = 'Hang in there';
+      }
+      props.onSendMessage?.(evt_json['message'], ChatMessageType.AI);
+    }
+    // Handle binary or base64 encoded data
+    else {
+      try {
+        // Check if the data is a string that can be decoded as base64
+        if (typeof event.data === 'string') {
+          // Simple check if it's likely base64 (contains only valid base64 chars)
+          const isLikelyBase64 = /^[A-Za-z0-9+/=]+$/.test(event.data.trim());
+          
+          if (isLikelyBase64) {
+            var chat_output = JSON.parse(atob(event.data));
+            if ('text' in chat_output) {
+              if (msgs) {
+                msgs += chat_output['text'];
+              } else {
+                msgs = chat_output['text'];
+              }
+              
+              if (msgs.endsWith('ack-end-of-msg')) {
+                msgs = msgs.replace('ack-end-of-msg', '');
+                setTimeout(() => {
+                  setDisabled(false);
+                }, 3000);
+              }
+              props.onSendMessage?.(msgs, ChatMessageType.AI);
+            } else {
+              // Display errors
+              props.onSendMessage?.(JSON.stringify(chat_output), ChatMessageType.AI);
+              setDisabled(false);
+            }
+          } else {
+            // Handle non-base64 string data
+            console.log("Received non-base64 string data:", event.data.substring(0, 100) + "...");
+            props.onSendMessage?.("Received message: " + event.data.substring(0, 50) + "...", ChatMessageType.AI);
+            setDisabled(false);
+          }
+        } 
+        // Handle binary data (Blob or ArrayBuffer)
+        else if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+          console.log("Received binary data");
+          // Convert binary data to text if needed
+          const reader = new FileReader();
+          reader.onload = function() {
+            const text = reader.result;
+            props.onSendMessage?.("Received binary data", ChatMessageType.AI);
+          };
+          reader.readAsText(event.data instanceof Blob ? event.data : new Blob([event.data]));
+          setDisabled(false);
+        }
+        else {
+          console.error("Unknown data type received:", typeof event.data);
+          props.onSendMessage?.("Received unknown data type", ChatMessageType.AI);
+          setDisabled(false);
+        }
+      } catch (parsingError) {
+        console.error("Failed to parse message:", parsingError, 
+                      typeof event.data === 'string' ? event.data.substring(0, 100) : "Binary data");
+        props.onSendMessage?.("Error processing response", ChatMessageType.AI);
+        setDisabled(false);
+      }
+    }
+  } catch (error) {
+    console.error("WebSocket message error:", error);
+    props.onSendMessage?.("Error handling message", ChatMessageType.AI);
+    setDisabled(false);
+  }
+};
+
+
+
+
+
+====================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 chat-ui-input-panel.tsx:300 Failed to parse message: SyntaxError: Unexpected token '', "çk¡É,k+!zYh" is not valid JSON
     at JSON.parse (<anonymous>)
     at ws.onmessage (chat-ui-input-panel.tsx:279:32) Bedrock says hello

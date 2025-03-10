@@ -1,70 +1,47 @@
 ws.onmessage = (event) => {
   try {
-    console.log("Raw message:", event.data.substring(0, 100));
+    console.log("Raw data received:", typeof event.data, event.data?.substring(0, 50));
     
-    // Handle JSON messages with 'message' field
-    if (typeof event.data === 'string' && event.data.includes('message')) {
-      var evt_json = JSON.parse(event.data);
-      props.onSendMessage?.(evt_json['message'], ChatMessageType.AI);
-      return;
-    }
-    
-    // Try base64 decoding
+    // Try decode as base64
     try {
-      const decodedData = atob(event.data);
-      console.log("Decoded:", decodedData.substring(0, 100));
+      const decodedText = atob(event.data);
+      console.log("Decoded text:", decodedText?.substring(0, 50));
       
-      // Check if it looks like JSON (starts with { or [)
-      if (decodedData.trim().startsWith('{') || decodedData.trim().startsWith('[')) {
-        try {
-          const chat_output = JSON.parse(decodedData);
-          console.log("JSON parsed successfully:", chat_output);
+      // Try to extract text content using regex
+      if (decodedText.includes('"text"')) {
+        const textMatch = decodedText.match(/"text"\s*:\s*"([^"]*)"/) || 
+                         decodedText.match(/"text"\s*:\s*"([^"]*)$/);
+        
+        if (textMatch && textMatch[1]) {
+          const textContent = textMatch[1]
+            .replace(/\\"/g, '"')
+            .replace(/\\n/g, '\n');
           
-          if ('text' in chat_output) {
-            console.log("Found text field:", chat_output.text);
-            
-            // Accumulate text
-            if (msgs) {
-              msgs += chat_output.text;
-            } else {
-              msgs = chat_output.text;
-            }
-            
-            // Check for end marker
-            if (msgs.includes('ack-end-of-msg')) {
-              msgs = msgs.replace('ack-end-of-msg', '');
-              props.onSendMessage?.(msgs, ChatMessageType.AI);
-              msgs = null;
-              setDisabled(false);
-            } else {
-              props.onSendMessage?.(msgs, ChatMessageType.AI);
-            }
+          console.log("Extracted text:", textContent);
+          
+          // Handle end marker
+          if (textContent === "ack-end-of-msg") {
+            setDisabled(false);
+            return;
+          }
+          
+          // Accumulate message text
+          if (msgs === null) {
+            msgs = textContent;
           } else {
-            console.log("No text field in JSON");
-            props.onSendMessage?.("Received: " + JSON.stringify(chat_output), ChatMessageType.AI);
+            msgs += textContent;
           }
-        } catch (jsonError) {
-          console.error("JSON parse error:", jsonError, "Data:", decodedData);
-          // Send the raw decoded text since it failed JSON parsing
-          if (decodedData && decodedData.length > 0) {
-            props.onSendMessage?.("Raw message: " + decodedData, ChatMessageType.AI);
-          }
+          
+          // Important: Always send the ENTIRE accumulated message
+          props.onSendMessage?.(msgs, ChatMessageType.AI);
         }
-      } else {
-        console.log("Decoded data isn't JSON format");
-        props.onSendMessage?.("Received: " + decodedData, ChatMessageType.AI);
       }
-    } catch (b64Error) {
-      console.error("Base64 decode error:", b64Error);
-      props.onSendMessage?.("Received: " + event.data, ChatMessageType.AI);
+    } catch (error) {
+      console.error("Processing error:", error);
+      props.onSendMessage?.(event.data, ChatMessageType.AI);
     }
-    
   } catch (error) {
-    console.error("General error:", error);
-    props.onSendMessage?.("Error processing message", ChatMessageType.AI);
-  } finally {
-    if (event.data.includes('"done":true') || event.data.includes('ack-end-of-msg')) {
-      setDisabled(false);
-    }
+    console.error("WebSocket error:", error);
+    setDisabled(false);
   }
 };

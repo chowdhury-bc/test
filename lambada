@@ -1,50 +1,47 @@
 ws.onmessage = (event) => {
-  console.log("Raw message:", typeof event.data, event.data.substring(0, 50));
+  const rawData = event.data;
+  console.log("Raw data received:", typeof rawData, rawData?.substring(0, 50));
   
+  // Just display text directly if possible
   try {
-    // Safely decode base64
+    // Try decode as base64
     let decodedText;
     try {
-      decodedText = atob(event.data);
-      console.log("Decoded:", decodedText.substring(0, 50));
-    } catch (b64Error) {
-      console.error("Base64 decode failed:", b64Error);
-      props.onSendMessage?.(event.data, ChatMessageType.AI);
+      decodedText = atob(rawData);
+      console.log("Decoded text:", decodedText?.substring(0, 50));
+    } catch (e) {
+      console.log("Not base64, using as-is");
+      props.onSendMessage?.(rawData, ChatMessageType.AI);
       return;
     }
     
-    // Safely parse JSON
-    let parsedData;
-    try {
-      parsedData = JSON.parse(decodedText);
-    } catch (jsonError) {
-      console.error("JSON parse failed:", jsonError);
-      // Just show the raw text if we can't parse it
-      props.onSendMessage?.(decodedText, ChatMessageType.AI);
-      return;
-    }
-    
-    // Process the message based on content
-    if (parsedData.text) {
-      if (parsedData.text === "ack-end-of-msg") {
-        setTimeout(() => setDisabled(false), 1000);
+    // Try to find a text field without full JSON parsing
+    if (decodedText.includes('"text"')) {
+      const textMatch = decodedText.match(/"text"\s*:\s*"([^"]*)"/) || 
+                       decodedText.match(/"text"\s*:\s*"([^"]*)$/);
+      
+      if (textMatch && textMatch[1]) {
+        const textContent = textMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+        console.log("Extracted text:", textContent);
+        
+        if (textContent === "ack-end-of-msg") {
+          setDisabled(false);
+          return;
+        }
+        
+        // Accumulate and display
+        msgs = msgs ? msgs + textContent : textContent;
+        props.onSendMessage?.(msgs, ChatMessageType.AI);
         return;
       }
-      
-      // Accumulate text
-      msgs = msgs ? msgs + parsedData.text : parsedData.text;
-      props.onSendMessage?.(msgs, ChatMessageType.AI);
-    } 
-    else if (parsedData.intermediate_execution || parsedData.prompt_flow) {
-      console.log("System message:", parsedData);
-      if (parsedData.done) setDisabled(false);
     }
-    else {
-      console.log("Unknown format:", parsedData);
-      props.onSendMessage?.(JSON.stringify(parsedData), ChatMessageType.AI);
-    }
+    
+    // Fallback - just show the decoded text
+    props.onSendMessage?.(decodedText, ChatMessageType.AI);
+    
   } catch (error) {
-    console.error("General error:", error);
+    console.error("Processing error:", error);
+    props.onSendMessage?.("Error processing message", ChatMessageType.AI);
     setDisabled(false);
   }
 };

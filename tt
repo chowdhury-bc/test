@@ -1,26 +1,183 @@
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AllowTaggingOperations",
-      "Effect": "Allow",
-      "Action": [
-        "tag:GetResources",
-        "tag:TagResources",
-        "tag:UntagResources"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "AllowIAMRoleCreation",
-      "Effect": "Allow",
-      "Action": [
-        "iam:CreateRole",
-        "iam:PutRolePolicy",
-        "iam:AttachRolePolicy",
-        "iam:PassRole"
-      ],
-      "Resource": "arn:aws:iam::123456789012:role/*"
-    }
-  ]
-}
+websocketurl wss://5tjomqwejc.execute-api.us-east-1.amazonaws.com/dev/?access_token=eyJraWQiOiJORW5kdFwvbmd1ZVJ3djBleHdtQzZTVTJzR2xFSzBraVhDWWZoK0JlaEJLWT0iLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhNDk4NjQyOC0zMDQxLTcwNjgtZmRiNC1lMmVhNGVkYTA4MGEiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfdTZhR3ZId2lVIiwiY29nbml0bzp1c2VybmFtZSI6ImE0OTg2NDI4LTMwNDEtNzA2OC1mZGI0LWUyZWE0ZWRhMDgwYSIsIm9yaWdpbl9qdGkiOiJiYTA0MjkxYS02YTQ2LTQ1NjEtOGI0Ni1lNTU3ODdkOTk4YjciLCJhdWQiOiI3YjNlMDRtNWExbjk1NG1laGp1bmdsaGQ5biIsImV2ZW50X2lkIjoiYzhmNjBiNzgtZWQ5Zi00ZDVhLWIwNTQtMWVjOWRhMjQ4YTBmIiwidG9rZW5fdXNlIjoiaWQiLCJhdXRoX3RpbWUiOjE3NDE0NDQ0NDAsImV4cCI6MTc0MTU3MzY1MCwiaWF0IjoxNzQxNTcwMDUwLCJqdGkiOiJmNDdlMWEwNy02NjMyLTRjNzEtOThiMC1hNTVhYTVkNTM2ZDUiLCJlbWFpbCI6InVjaG93ZGh1cnlAY29udHJhY3Rvci51c2dzLmdvdiJ9.rM5EnQKkBsztWh3VVRwDxL2gOqPNMVGLs6D12zldKo9W9O-Op1Q7x9rdcV7iq6jGD_rJVzGbxvsKZ62j4j7bQJziPPOKrZo8iKk8yQ8g3FZ-7ST9vQ8Ed5bdKaTfCDCFCBCuWYNWoFYH2D_a8ljXiFiqNMRv8gvoZywaWUrp46bLgHYN8knFA0c8BxARsvPvt9nb0Ks5Qc8zjy1qVEFTrRKC5uzVQkXEdMg5Uxnwz1HpnPKBqvPU6wQ_YIYTZXFeBfSISs7F-6oojgaut8NueedsqYLqG_0zHXC_-a7SYHyt8zXuRwEd42L5eeAEygQy01YeUGg3QBgbQ7CsLNhu6g
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIlVuZm9ydHVuYXRlbHkifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "Unfortunately"}
+chat-ui-input-panel.tsx:586 Extracted text: Unfortunately
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiwifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": ","}
+chat-ui-input-panel.tsx:586 Extracted text: ,
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB3aXRob3V0In0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " without"}
+chat-ui-input-panel.tsx:586 Extracted text:  without
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBhbnkifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " any"}
+chat-ui-input-panel.tsx:586 Extracted text:  any
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBjb250ZXh0In0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " context"}
+chat-ui-input-panel.tsx:586 Extracted text:  context
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBwcm92aWRlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " provide"}
+chat-ui-input-panel.tsx:586 Extracted text:  provide
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogImQsIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "d,"}
+chat-ui-input-panel.tsx:586 Extracted text: d,
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBJIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " I"}
+chat-ui-input-panel.tsx:586 Extracted text:  I
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogImRvIG5vdCJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "do not"}
+chat-ui-input-panel.tsx:586 Extracted text: do not
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBoYXZlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " have"}
+chat-ui-input-panel.tsx:586 Extracted text:  have
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBlbm91Z2gifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " enough"}
+chat-ui-input-panel.tsx:586 Extracted text:  enough
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBpbmZvcm1hdGlvbiJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " information"}
+chat-ui-input-panel.tsx:586 Extracted text:  information
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB0byJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " to"}
+chat-ui-input-panel.tsx:586 Extracted text:  to
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBwcm92aWRlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " provide"}
+chat-ui-input-panel.tsx:586 Extracted text:  provide
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBhIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " a"}
+chat-ui-input-panel.tsx:586 Extracted text:  a
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBoZWxwZnVsIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " helpful"}
+chat-ui-input-panel.tsx:586 Extracted text:  helpful
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiByZXNwb25zZSJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " response"}
+chat-ui-input-panel.tsx:586 Extracted text:  response
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB0byJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " to"}
+chat-ui-input-panel.tsx:586 Extracted text:  to
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB5b3VyIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " your"}
+chat-ui-input-panel.tsx:586 Extracted text:  your
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBxdWVzdGlvbiJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " question"}
+chat-ui-input-panel.tsx:586 Extracted text:  question
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBhYm91dCJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " about"}
+chat-ui-input-panel.tsx:586 Extracted text:  about
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBcIiJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " \""}
+chat-ui-input-panel.tsx:586 Extracted text:  \
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogImRhdGEifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "data"}
+chat-ui-input-panel.tsx:586 Extracted text: data
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBzY2llbmNlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " science"}
+chat-ui-input-panel.tsx:586 Extracted text:  science
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIlwiLiJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "\"."}
+chat-ui-input-panel.tsx:586 Extracted text: \
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBDb3VsIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " Coul"}
+chat-ui-input-panel.tsx:586 Extracted text:  Coul
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogImQgeW91In0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "d you"}
+chat-ui-input-panel.tsx:586 Extracted text: d you
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBwbGVhc2UifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " please"}
+chat-ui-input-panel.tsx:586 Extracted text:  please
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBwcm92aWRlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " provide"}
+chat-ui-input-panel.tsx:586 Extracted text:  provide
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBtb3JlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " more"}
+chat-ui-input-panel.tsx:586 Extracted text:  more
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBkZXRhaWxzIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " details"}
+chat-ui-input-panel.tsx:586 Extracted text:  details
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBvciJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " or"}
+chat-ui-input-panel.tsx:586 Extracted text:  or
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBjb250ZXh0In0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " context"}
+chat-ui-input-panel.tsx:586 Extracted text:  context
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBhYm91dCJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " about"}
+chat-ui-input-panel.tsx:586 Extracted text:  about
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB3aGF0In0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " what"}
+chat-ui-input-panel.tsx:586 Extracted text:  what
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBzcGVjaWZpY2FsbHkifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " specifically"}
+chat-ui-input-panel.tsx:586 Extracted text:  specifically
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB5b3UifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " you"}
+chat-ui-input-panel.tsx:586 Extracted text:  you
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB3b3VsIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " woul"}
+chat-ui-input-panel.tsx:586 Extracted text:  woul
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogImQgbGlrZSJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "d like"}
+chat-ui-input-panel.tsx:586 Extracted text: d like
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB0byJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " to"}
+chat-ui-input-panel.tsx:586 Extracted text:  to
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBrbm93In0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " know"}
+chat-ui-input-panel.tsx:586 Extracted text:  know
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBhYm91dCJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " about"}
+chat-ui-input-panel.tsx:586 Extracted text:  about
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBkYXRhIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " data"}
+chat-ui-input-panel.tsx:586 Extracted text:  data
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBzY2llbmNlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " science"}
+chat-ui-input-panel.tsx:586 Extracted text:  science
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIj8ifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "?"}
+chat-ui-input-panel.tsx:586 Extracted text: ?
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBJIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " I"}
+chat-ui-input-panel.tsx:586 Extracted text:  I
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIicifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "'"}
+chat-ui-input-panel.tsx:586 Extracted text: '
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogImQgYmUifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "d be"}
+chat-ui-input-panel.tsx:586 Extracted text: d be
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBoYXBweSJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " happy"}
+chat-ui-input-panel.tsx:586 Extracted text:  happy
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB0byJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " to"}
+chat-ui-input-panel.tsx:586 Extracted text:  to
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBhc3Npc3QifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " assist"}
+chat-ui-input-panel.tsx:586 Extracted text:  assist
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiB5b3UifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " you"}
+chat-ui-input-panel.tsx:586 Extracted text:  you
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBmdXJ0aGVyIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " further"}
+chat-ui-input-panel.tsx:586 Extracted text:  further
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBvbmNlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " once"}
+chat-ui-input-panel.tsx:586 Extracted text:  once
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBJIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " I"}
+chat-ui-input-panel.tsx:586 Extracted text:  I
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBoYXZlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " have"}
+chat-ui-input-panel.tsx:586 Extracted text:  have
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBtb3JlIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " more"}
+chat-ui-input-panel.tsx:586 Extracted text:  more
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIiBpbmZvcm1hdGlvbiJ9
+chat-ui-input-panel.tsx:572 Decoded text: {"text": " information"}
+chat-ui-input-panel.tsx:586 Extracted text:  information
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogIi4ifQ==
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "."}
+chat-ui-input-panel.tsx:586 Extracted text: .
+chat-ui-input-panel.tsx:564 Raw data received: string eyJ0ZXh0IjogImFjay1lbmQtb2YtbXNnIn0=
+chat-ui-input-panel.tsx:572 Decoded text: {"text": "ack-end-of-msg"}
+chat-ui-input-panel.tsx:586 Extracted text: ack-end-of-msg
+chat-ui-input-panel.tsx:564 Raw data received: string 
+chat-ui-input-panel.tsx:572 Decoded text: 

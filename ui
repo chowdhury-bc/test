@@ -1,61 +1,70 @@
 ws.onmessage = (event) => {
   try {
-    // For debugging
-    console.log("Raw message received:", event.data.substring(0, 50));
+    console.log("Raw message:", event.data.substring(0, 100));
     
-    // Handle regular JSON messages
+    // Handle JSON messages with 'message' field
     if (typeof event.data === 'string' && event.data.includes('message')) {
       var evt_json = JSON.parse(event.data);
       props.onSendMessage?.(evt_json['message'], ChatMessageType.AI);
       return;
     }
     
-    // Handle base64 encoded data
+    // Try base64 decoding
     try {
-      // Try to decode base64
       const decodedData = atob(event.data);
-      console.log("Decoded data:", decodedData.substring(0, 100));
+      console.log("Decoded:", decodedData.substring(0, 100));
       
-      try {
-        // Try to parse as JSON
-        const chat_output = JSON.parse(decodedData);
-        
-        if ('text' in chat_output) {
-          if (msgs) {
-            msgs += chat_output['text'];
-          } else {
-            msgs = chat_output['text'];
-          }
+      // Check if it looks like JSON (starts with { or [)
+      if (decodedData.trim().startsWith('{') || decodedData.trim().startsWith('[')) {
+        try {
+          const chat_output = JSON.parse(decodedData);
+          console.log("JSON parsed successfully:", chat_output);
           
-          if (msgs.endsWith('ack-end-of-msg')) {
-            msgs = msgs.replace('ack-end-of-msg', '');
-            props.onSendMessage?.(msgs, ChatMessageType.AI);
-            msgs = null;
-            setTimeout(() => setDisabled(false), 3000);
+          if ('text' in chat_output) {
+            console.log("Found text field:", chat_output.text);
+            
+            // Accumulate text
+            if (msgs) {
+              msgs += chat_output.text;
+            } else {
+              msgs = chat_output.text;
+            }
+            
+            // Check for end marker
+            if (msgs.includes('ack-end-of-msg')) {
+              msgs = msgs.replace('ack-end-of-msg', '');
+              props.onSendMessage?.(msgs, ChatMessageType.AI);
+              msgs = null;
+              setDisabled(false);
+            } else {
+              props.onSendMessage?.(msgs, ChatMessageType.AI);
+            }
           } else {
-            props.onSendMessage?.(msgs, ChatMessageType.AI);
+            console.log("No text field in JSON");
+            props.onSendMessage?.("Received: " + JSON.stringify(chat_output), ChatMessageType.AI);
           }
-        } else {
-          // Handle other message types
-          console.log("Non-text output:", chat_output);
-          props.onSendMessage?.(JSON.stringify(chat_output), ChatMessageType.AI);
-          setDisabled(false);
+        } catch (jsonError) {
+          console.error("JSON parse error:", jsonError, "Data:", decodedData);
+          // Send the raw decoded text since it failed JSON parsing
+          if (decodedData && decodedData.length > 0) {
+            props.onSendMessage?.("Raw message: " + decodedData, ChatMessageType.AI);
+          }
         }
-      } catch (jsonError) {
-        // If JSON parsing fails, just use the raw decoded text
-        console.log("Not valid JSON, using raw decoded text");
-        props.onSendMessage?.(decodedData, ChatMessageType.AI);
-        setDisabled(false);
+      } else {
+        console.log("Decoded data isn't JSON format");
+        props.onSendMessage?.("Received: " + decodedData, ChatMessageType.AI);
       }
     } catch (b64Error) {
-      // If base64 decoding fails, use the raw message
-      console.log("Not valid base64, using raw message");
-      props.onSendMessage?.(event.data, ChatMessageType.AI);
+      console.error("Base64 decode error:", b64Error);
+      props.onSendMessage?.("Received: " + event.data, ChatMessageType.AI);
+    }
+    
+  } catch (error) {
+    console.error("General error:", error);
+    props.onSendMessage?.("Error processing message", ChatMessageType.AI);
+  } finally {
+    if (event.data.includes('"done":true') || event.data.includes('ack-end-of-msg')) {
       setDisabled(false);
     }
-  } catch (error) {
-    console.error("WebSocket processing error:", error);
-    props.onSendMessage?.("Error processing message", ChatMessageType.AI);
-    setDisabled(false);
   }
 };

@@ -1,50 +1,60 @@
 ws.onmessage = (event) => {
   try {
-    console.log("Raw message received:", typeof event.data, event.data.substring ? event.data.substring(0, 50) : "Non-string data");
+    // For debugging
+    console.log("Raw message received:", event.data.substring(0, 50));
     
+    // Handle regular JSON messages
     if (typeof event.data === 'string' && event.data.includes('message')) {
-      const evt_json = JSON.parse(event.data);
+      var evt_json = JSON.parse(event.data);
       props.onSendMessage?.(evt_json['message'], ChatMessageType.AI);
+      return;
     }
-    else if (typeof event.data === 'string') {
+    
+    // Handle base64 encoded data
+    try {
+      // Try to decode base64
+      const decodedData = atob(event.data);
+      console.log("Decoded data:", decodedData.substring(0, 100));
+      
       try {
-        const decodedData = atob(event.data);
-        console.log("Decoded data:", decodedData.substring(0, 50));
-        
+        // Try to parse as JSON
         const chat_output = JSON.parse(decodedData);
         
         if ('text' in chat_output) {
-          const textChunk = chat_output['text'];
-          console.log("Text chunk:", textChunk);
+          if (msgs) {
+            msgs += chat_output['text'];
+          } else {
+            msgs = chat_output['text'];
+          }
           
-          if (textChunk.includes('ack-end-of-msg')) {
-            const cleanedText = textChunk.replace('ack-end-of-msg', '');
-            if (cleanedText) {
-              props.onSendMessage?.(cleanedText, ChatMessageType.AI);
-            }
+          if (msgs.endsWith('ack-end-of-msg')) {
+            msgs = msgs.replace('ack-end-of-msg', '');
+            props.onSendMessage?.(msgs, ChatMessageType.AI);
+            msgs = null;
             setTimeout(() => setDisabled(false), 3000);
           } else {
-            props.onSendMessage?.(textChunk, ChatMessageType.AI);
+            props.onSendMessage?.(msgs, ChatMessageType.AI);
           }
-        } else if ('intermediate_execution' in chat_output) {
-          // Handle agent execution updates
-          console.log("Agent execution:", chat_output.intermediate_execution);
-        } else if ('prompt_flow' in chat_output && chat_output.done) {
-          // Handle completed conversation
-          setDisabled(false);
         } else {
-          console.log("Other output:", chat_output);
+          // Handle other message types
+          console.log("Non-text output:", chat_output);
           props.onSendMessage?.(JSON.stringify(chat_output), ChatMessageType.AI);
           setDisabled(false);
         }
-      } catch (e) {
-        console.error("Processing error:", e);
-        props.onSendMessage?.("Error processing response", ChatMessageType.AI);
+      } catch (jsonError) {
+        // If JSON parsing fails, just use the raw decoded text
+        console.log("Not valid JSON, using raw decoded text");
+        props.onSendMessage?.(decodedData, ChatMessageType.AI);
         setDisabled(false);
       }
+    } catch (b64Error) {
+      // If base64 decoding fails, use the raw message
+      console.log("Not valid base64, using raw message");
+      props.onSendMessage?.(event.data, ChatMessageType.AI);
+      setDisabled(false);
     }
   } catch (error) {
-    console.error("WebSocket error:", error);
+    console.error("WebSocket processing error:", error);
     props.onSendMessage?.("Error processing message", ChatMessageType.AI);
     setDisabled(false);
   }

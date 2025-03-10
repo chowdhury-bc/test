@@ -1,15 +1,12 @@
 ws.onmessage = (event) => {
   try {
-    // Debugging
     console.log("Raw message received:", typeof event.data, event.data.substring ? event.data.substring(0, 50) : "Non-string data");
     
-    // Check if the data is a string and includes 'message'
     if (typeof event.data === 'string' && event.data.includes('message')) {
-      var evt_json = JSON.parse(event.data);
+      const evt_json = JSON.parse(event.data);
       props.onSendMessage?.(evt_json['message'], ChatMessageType.AI);
     }
-    // Base64 handling
-    else if (typeof event.data === 'string' && /^[A-Za-z0-9+/=]+$/.test(event.data.trim())) {
+    else if (typeof event.data === 'string') {
       try {
         const decodedData = atob(event.data);
         console.log("Decoded data:", decodedData.substring(0, 50));
@@ -20,37 +17,34 @@ ws.onmessage = (event) => {
           const textChunk = chat_output['text'];
           console.log("Text chunk:", textChunk);
           
-          // Display each chunk directly to ensure streaming works
-          props.onSendMessage?.(textChunk, ChatMessageType.AI);
-          
-          // If this is the end marker, reset state
           if (textChunk.includes('ack-end-of-msg')) {
-            setDisabled(false);
+            const cleanedText = textChunk.replace('ack-end-of-msg', '');
+            if (cleanedText) {
+              props.onSendMessage?.(cleanedText, ChatMessageType.AI);
+            }
+            setTimeout(() => setDisabled(false), 3000);
+          } else {
+            props.onSendMessage?.(textChunk, ChatMessageType.AI);
           }
+        } else if ('intermediate_execution' in chat_output) {
+          // Handle agent execution updates
+          console.log("Agent execution:", chat_output.intermediate_execution);
+        } else if ('prompt_flow' in chat_output && chat_output.done) {
+          // Handle completed conversation
+          setDisabled(false);
         } else {
-          console.log("Non-text output:", chat_output);
+          console.log("Other output:", chat_output);
           props.onSendMessage?.(JSON.stringify(chat_output), ChatMessageType.AI);
           setDisabled(false);
         }
       } catch (e) {
-        console.error("Base64 parsing error:", e);
-        props.onSendMessage?.("Error parsing response", ChatMessageType.AI);
+        console.error("Processing error:", e);
+        props.onSendMessage?.("Error processing response", ChatMessageType.AI);
         setDisabled(false);
       }
     }
-    // Plain text handling
-    else if (typeof event.data === 'string') {
-      console.log("Plain text message:", event.data.substring(0, 50));
-      props.onSendMessage?.(event.data, ChatMessageType.AI);
-      setDisabled(false);
-    }
-    else {
-      console.error("Unknown data type:", typeof event.data);
-      props.onSendMessage?.("Unsupported response format", ChatMessageType.AI);
-      setDisabled(false);
-    }
   } catch (error) {
-    console.error("WebSocket processing error:", error);
+    console.error("WebSocket error:", error);
     props.onSendMessage?.("Error processing message", ChatMessageType.AI);
     setDisabled(false);
   }

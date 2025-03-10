@@ -1,3 +1,40 @@
+def fetch_data_v2(query, proper_nouns, is_hybrid_search):
+    LOG.info(f"fetch_data_v2 called with query: '{query}', proper_nouns: {proper_nouns}, hybrid_search: {is_hybrid_search}")
+    
+    try:
+        # Log OpenSearch connection details (without credentials)
+        LOG.info(f"Connecting to OpenSearch at endpoint (partial): {endpoint.split('@')[-1]}")
+        LOG.info(f"Using index: {INDEX_NAME}")
+        
+        # Log embedding generation
+        LOG.info(f"Generating embeddings for query")
+        
+        # After generating embeddings
+        LOG.info(f"Embeddings generated successfully")
+        
+        # Before OpenSearch query
+        LOG.info(f"Sending query to OpenSearch")
+        
+        # After OpenSearch query
+        LOG.info(f"OpenSearch query completed, processing results")
+        
+        # Return results
+        LOG.info(f"Returning {len(results)} results")
+        return formatted_results
+        
+    except Exception as e:
+        LOG.error(f"Error in fetch_data_v2: {str(e)}")
+        return None
+
+
+
+
+
+
+
+
+
+
 import boto3
 from os import getenv
 from opensearchpy import OpenSearch, RequestsHttpConnection, exceptions

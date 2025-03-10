@@ -1,53 +1,50 @@
 ws.onmessage = (event) => {
+  console.log("Raw message:", typeof event.data, event.data.substring(0, 50));
+  
   try {
-    console.log("Raw message received:", event.data.substring(0, 100));
+    // Safely decode base64
+    let decodedText;
+    try {
+      decodedText = atob(event.data);
+      console.log("Decoded:", decodedText.substring(0, 50));
+    } catch (b64Error) {
+      console.error("Base64 decode failed:", b64Error);
+      props.onSendMessage?.(event.data, ChatMessageType.AI);
+      return;
+    }
     
-    // ALL messages from the Lambda are base64 encoded
-    const decodedData = atob(event.data);
-    console.log("Decoded data:", decodedData.substring(0, 100));
+    // Safely parse JSON
+    let parsedData;
+    try {
+      parsedData = JSON.parse(decodedText);
+    } catch (jsonError) {
+      console.error("JSON parse failed:", jsonError);
+      // Just show the raw text if we can't parse it
+      props.onSendMessage?.(decodedText, ChatMessageType.AI);
+      return;
+    }
     
-    // Parse the JSON
-    const chat_output = JSON.parse(decodedData);
-    console.log("Parsed JSON:", chat_output);
-    
-    // Handle text chunks
-    if ('text' in chat_output) {
-      const textChunk = chat_output.text;
-      
-      // Handle end marker
-      if (textChunk === "ack-end-of-msg") {
-        setDisabled(false);
+    // Process the message based on content
+    if (parsedData.text) {
+      if (parsedData.text === "ack-end-of-msg") {
+        setTimeout(() => setDisabled(false), 1000);
         return;
       }
       
-      // Accumulate text chunks
-      if (msgs === null) {
-        msgs = textChunk;
-      } else {
-        msgs += textChunk;
-      }
-      
-      // Display the accumulated text
+      // Accumulate text
+      msgs = msgs ? msgs + parsedData.text : parsedData.text;
       props.onSendMessage?.(msgs, ChatMessageType.AI);
     } 
-    // Handle other message types
-    else if ('intermediate_execution' in chat_output) {
-      console.log("Agent execution:", chat_output.intermediate_execution);
-    }
-    else if ('prompt_flow' in chat_output) {
-      agent_prompt_flow = chat_output.prompt_flow;
-      if (chat_output.done) {
-        setDisabled(false);
-      }
+    else if (parsedData.intermediate_execution || parsedData.prompt_flow) {
+      console.log("System message:", parsedData);
+      if (parsedData.done) setDisabled(false);
     }
     else {
-      console.log("Other message type:", chat_output);
-      props.onSendMessage?.(JSON.stringify(chat_output), ChatMessageType.AI);
-      setDisabled(false);
+      console.log("Unknown format:", parsedData);
+      props.onSendMessage?.(JSON.stringify(parsedData), ChatMessageType.AI);
     }
   } catch (error) {
-    console.error("Error processing message:", error);
-    props.onSendMessage?.("Error processing response", ChatMessageType.AI);
+    console.error("General error:", error);
     setDisabled(false);
   }
 };

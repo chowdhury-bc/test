@@ -1,3 +1,15 @@
+2025-03-12T16:04:09.412Z
+[WARNING]	2025-03-12T16:04:09.412Z	sfgsdfgsdfg	POST https://sgfdgfdgsfgf.aoss.amazonaws.com:443/bedrock-knowledge-base*/_search [status:400 request:0.044s]
+
+[WARNING] 2025-03-12T16:04:09.412Z gsdfgsdfg POST https://dfgfdgsfgsdf.aoss.amazonaws.com:443/bedrock-knowledge-base*/_search [status:400 request:0.044s]
+2025-03-12T16:04:09.412Z
+[ERROR]	2025-03-12T16:04:09.412Z	gsdfgsfdgf	Vector Index query error RequestError(400, 'x_content_parse_exception', '[knn] unknown token [VALUE_NULL] after [vector]')
+
+[ERROR] 2025-03-12T16:04:09.412Z 2d681987-506b-4a14-ac4d-3ac3afafd8bf Vector Index query error RequestError(400, 'x_content_parse_exception', '[knn] unknown token [VALUE_NULL] after [vector]')
+
+
+
+
 ws.onmessage = (event) => {
   try {
     console.log("Raw data received:", typeof event.data, event.data?.substring(0, 50));

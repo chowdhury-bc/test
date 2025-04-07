@@ -46,3 +46,54 @@ scp
     ]
 }
 
+
+
+=====================================
+
+{
+    "Version": "2012-10-17",
+    "Statement": [{
+            "Sid": "InvokeFoundationModelStatement1",
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream"
+            ],
+            "Resource": [
+                "arn:aws:bedrock:us-east-1::foundation-model/*"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "bedrock:GuardrailIdentifier": "arn:aws:bedrock:us-east-1:2342342:guardrail/14wezoi3r4n1"
+                }
+            }
+        },
+        {
+            "Sid": "InvokeFoundationModelStatement2",
+            "Effect": "Deny",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream"
+            ],
+            "Resource": [
+                "arn:aws:bedrock:us-east-1::foundation-model/*"
+            ],
+            "Condition": {
+                "StringNotEquals": {
+                    "bedrock:GuardrailIdentifier": "arn:aws:bedrock:us-east-1:5234534534:guardrail/14wezoi3r4n1"
+                }
+            }
+        },
+        {
+            "Sid": "ApplyGuardrail",
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:ApplyGuardrail"
+            ],
+            "Resource": [
+                "arn:aws:bedrock:us-east-1:53425324534:guardrail/wtwergwerg"
+            ]
+        }
+    ]
+}
+

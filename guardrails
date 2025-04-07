@@ -1,1 +1,48 @@
+scp 
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Deny",
+            "Action": "bedrock:CreateKnowledgeBase",
+            "Resource": "*",
+            "Condition": {
+                "StringNotEqualsIfExists": {
+                    "bedrock:GuardrailConfiguration": "ENABLED"
+                }
+            }
+        },
+        {
+            "Effect": "Deny",
+            "Action": "bedrock:UpdateKnowledgeBase",
+            "Resource": "*",
+            "Condition": {
+                "StringNotEqualsIfExists": {
+                    "bedrock:GuardrailConfiguration": "ENABLED"
+                }
+            }
+        }
+    ]
+}
+
+
+
+
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Deny",
+            "Action": "bedrock:CreateKnowledgeBase",
+            "Resource": "*",
+            "Condition": {
+                "StringNotEqualsIfExists": {
+                    "bedrock:GuardrailConfiguration": "ENABLED"
+                }
+            }
+        }
+    ]
+}
 

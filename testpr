@@ -406,3 +406,6 @@ fi
 
 # Deactivate virtual environment
 deactivate
+
+
+* * * * * cd /usr/bin/code && /usr/bin/code/script.sh >> /usr/bin/code/cron.log 2>&1

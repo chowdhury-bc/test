@@ -16,18 +16,12 @@ source "${VENV_PATH}/bin/activate"
 # Check if virtual environment was activated properly
 if [ -z "$VIRTUAL_ENV" ]; then
     echo "Error: Virtual environment not activated properly"
-    echo "Using Python from PATH"
-    PYTHON_CMD="python"
+    exit 1
 else
     echo "Virtual environment activated successfully: $VIRTUAL_ENV"
-    PYTHON_CMD="python"  # This will use the Python from the activated venv
+    echo "Python executable: $(which python)"
+    echo "Python version: $(python --version)"
 fi
-
-# Verify python version and packages
-echo "Python executable: $(which $PYTHON_CMD)"
-echo "Python version: $($PYTHON_CMD --version)"
-echo "Checking key packages..."
-$PYTHON_CMD -c "import sys; print('sys.path:', sys.path)"
 
 # Configuration variables with absolute paths
 BUCKET_NAME="dataimages"
@@ -38,6 +32,10 @@ PREV_FILE_HASH="/usr/bin/code/previous_file_hash.txt"
 PREDICTIONS_FILE="/usr/bin/code/testpredictions/predictions.csv"
 INFERENCE_OUTPUT="/usr/bin/code/inference_predictions.csv"
 TEMP_FILE="/usr/bin/code/tmp/temp_predictions.csv"
+DEBUG_DIR="/usr/bin/code/debug"
+
+# Create debug directory
+mkdir -p "$DEBUG_DIR"
 
 # Function to convert UTC to EST timestamp
 convert_to_est() {
@@ -93,6 +91,16 @@ archive_predictions() {
     fi
 }
 
+# Clear AWS CLI cache if it exists
+if [ -d ~/.aws/cli/cache ]; then
+    echo "Clearing AWS CLI cache..."
+    rm -rf ~/.aws/cli/cache/*
+fi
+
+# Check AWS credentials and configuration
+echo "Checking AWS configuration..."
+/usr/local/bin/aws configure list
+
 # Check that $DOWNLOAD_DIR is not empty and it points to a valid directory
 if [ -z "$DOWNLOAD_DIR" ]; then
     echo "Error: DOWNLOAD_DIR is not set."
@@ -124,13 +132,20 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Current timestamp for cache busting
+TIMESTAMP=$(date +%s)
+echo "Using cache-busting timestamp: $TIMESTAMP"
+
 # Get list of all objects with their LastModified timestamps
 echo "Fetching S3 objects..."
 all_objects=$(/usr/local/bin/aws s3api list-objects-v2 \
     --bucket $BUCKET_NAME \
     --prefix $PREFIX \
-    --query 'Contents[].{Key: Key, LastModified: LastModified}' \
+    --query "Contents[].{Key: Key, LastModified: LastModified}" \
     --output json)
+
+# Save objects for debugging
+echo "$all_objects" > "$DEBUG_DIR/s3_objects_$TIMESTAMP.json"
 
 # Check if we got a valid response
 if [ -z "$all_objects" ] || [ "$all_objects" == "null" ]; then
@@ -138,12 +153,26 @@ if [ -z "$all_objects" ] || [ "$all_objects" == "null" ]; then
     exit 1
 fi
 
+# Print all objects sorted by timestamp (for debugging)
+echo "All objects in bucket (sorted by modification time, showing last 5):"
+echo "$all_objects" | jq -r 'sort_by(.LastModified) | .[] | "\(.LastModified) \(.Key)"' | tail -5
+
 # Get the most recent file (sorting by LastModified timestamp)
 latest_file_info=$(echo "$all_objects" | jq -r 'sort_by(.LastModified)[-1]')
 
 # Extract the key and last modified timestamp
 key=$(echo "$latest_file_info" | jq -r '.Key')
 s3_timestamp_utc=$(echo "$latest_file_info" | jq -r '.LastModified')
+
+# Double-check with direct HEAD request
+echo "Verifying latest file metadata directly..."
+direct_check=$(/usr/local/bin/aws s3api head-object \
+    --bucket $BUCKET_NAME \
+    --key "$key")
+
+direct_timestamp=$(echo "$direct_check" | jq -r '.LastModified')
+echo "Direct check timestamp: $direct_timestamp"
+echo "$direct_check" > "$DEBUG_DIR/head_object_$TIMESTAMP.json"
 
 # Check if the key was retrieved and is valid
 if [ -z "$key" ] || [ "$key" == "null" ]; then
@@ -167,10 +196,18 @@ if [ -f "$LAST_TIMESTAMP_FILE" ]; then
     last_processed=$(cat "$LAST_TIMESTAMP_FILE")
     echo "Last processed timestamp: $last_processed"
     
-    if [ "$last_processed" = "$s3_timestamp_utc" ]; then
-        echo "File already processed based on timestamp. Checking for new files..."
+    # Convert to epoch for reliable comparison
+    last_epoch=$(date -d "$last_processed" +%s)
+    current_epoch=$(date -d "$s3_timestamp_utc" +%s)
+    
+    echo "Last processed (epoch): $last_epoch"
+    echo "Current file (epoch): $current_epoch"
+    
+    if [ $current_epoch -le $last_epoch ]; then
+        echo "CRITICAL: No newer files found. Current file is same or older than last processed."
         
-        # Check if there are newer files that were uploaded after our script last ran
+        # Explicitly check for new files
+        echo "Checking explicitly for newer files..."
         newer_objects=$(/usr/local/bin/aws s3api list-objects-v2 \
             --bucket $BUCKET_NAME \
             --prefix $PREFIX \
@@ -178,17 +215,39 @@ if [ -f "$LAST_TIMESTAMP_FILE" ]; then
             --output json)
             
         newer_count=$(echo "$newer_objects" | jq 'length')
+        echo "$newer_objects" > "$DEBUG_DIR/newer_objects_$TIMESTAMP.json"
         
         if [ "$newer_count" -eq 0 ] || [ "$newer_objects" == "null" ]; then
-            echo "No newer files found. Exiting."
-            exit 0
+            echo "No newer files confirmed. Checking if FORCE_PROCESSING is enabled..."
+            
+            # Only continue if forced or if it's been more than 1 hour since last run
+            hours_since=$((($TIMESTAMP - $last_epoch) / 3600))
+            echo "Hours since last run: $hours_since"
+            
+            if [ "$FORCE_PROCESSING" = "1" ] || [ $hours_since -ge 1 ]; then
+                if [ "$FORCE_PROCESSING" = "1" ]; then
+                    echo "FORCE_PROCESSING is enabled. Continuing despite no new files..."
+                else
+                    echo "Over 1 hour since last run. Processing anyway as a periodic check..."
+                fi
+            else
+                echo "To force processing anyway, run with: FORCE_PROCESSING=1 $0"
+                echo "Exiting due to no new files."
+                exit 0
+            fi
         else
             echo "Found $newer_count newer files since last run. Continuing..."
-            # We'll use the latest_file_info we already got
+            # Use the newest file from the newer objects
+            latest_new_file=$(echo "$newer_objects" | jq -r 'sort_by(.LastModified)[-1]')
+            key=$(echo "$latest_new_file" | jq -r '.Key')
+            s3_timestamp_utc=$(echo "$latest_new_file" | jq -r '.LastModified')
+            echo "Selected newest file: $key (Last modified: $s3_timestamp_utc)"
         fi
     else
-        echo "New file detected based on timestamp. Continuing..."
+        echo "New file detected! Timestamp is newer than last processed."
     fi
+else
+    echo "No last processed timestamp found. This appears to be the first run."
 fi
 
 # Download the latest file to the download directory
@@ -220,7 +279,6 @@ if [ -f "$PREV_FILE_HASH" ]; then
     if [ "$previous_hash" = "$current_file_hash" ]; then
         echo "Warning: Downloaded file is identical to previously processed file."
         echo "This might indicate an issue with S3 updates or the cron job timing."
-        # Continue processing anyway, but log the warning
     else
         echo "File content has changed from previous run."
     fi
@@ -247,14 +305,9 @@ echo "Processing Time (EST): $current_time_est" >> "$timestamp_log"
 # Log the downloaded file info
 echo "$downloaded_file $s3_timestamp_est $current_time_est" > /usr/bin/code/files_to_download.txt
 
-# Save the timestamp
-echo "$s3_timestamp_utc" > "$LAST_TIMESTAMP_FILE"
-
-echo "Latest file downloaded successfully: $key"
-
 # Run the Python script for inference
-echo "Starting inference with Python: $($PYTHON_CMD --version)"
-$PYTHON_CMD /usr/bin/code/infer.py --input_img_size 600 \
+echo "Starting inference with Python: $(python --version)"
+python /usr/bin/code/infer.py --input_img_size 600 \
     --model_path /usr/bin/code/model/* \
     --image_path "$DOWNLOAD_DIR"
 
@@ -332,6 +385,10 @@ echo "Current predictions file size: $(wc -l < "$PREDICTIONS_FILE") lines"
 echo "Current predictions file size (bytes): $(ls -lh "$PREDICTIONS_FILE" | awk '{print $5}')"
 echo "==============================================="
 
+# CRITICAL: Save the timestamp AFTER successful processing
+echo "$s3_timestamp_utc" > "$LAST_TIMESTAMP_FILE"
+echo "Updated last processed timestamp to: $s3_timestamp_utc"
+
 echo "============== Process Complete =============="
 echo "Final completion time (EST): $completion_time_est"
 echo "Processed file: $key"
@@ -349,8 +406,3 @@ fi
 
 # Deactivate virtual environment
 deactivate
-
-
-
-
-* * * * * cd /usr/bin/code && /usr/bin/code/script.sh >> /usr/bin/code/cron.log 2>&1

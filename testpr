@@ -1,0 +1,194 @@
+#!/bin/bash
+
+# Activate the virtual environment
+source "/usr/bin/code/py311/bin/activate"
+
+BUCKET_NAME="dataimages"
+PREFIX="s3preixforfiles"
+DOWNLOAD_DIR="/usr/bin/code/100files"
+LAST_TIMESTAMP_FILE="last_processed_timestamp.txt"
+
+# Function to convert UTC to EST timestamp
+convert_to_est() {
+    local utc_time="$1"
+    TZ="America/New_York" date -d "$utc_time" "+%Y-%m-%d %H:%M:%S %Z"
+}
+
+# Function to rotate predictions file
+manage_predictions_file() {
+    local predictions_file="/usr/bin/code/testpredictions/predictions.csv"
+    local max_lines=1000  # Keep last 1000 predictions (adjust as needed)
+    local temp_file="/usr/bin/code/tmp/temp_predictions.csv"
+
+    if [ -f "$predictions_file" ]; then
+        # Get the header line
+        head -n 1 "$predictions_file" > "$temp_file"
+
+        # Append the last max_lines-1 (excluding header) to temp file
+        tail -n "$max_lines" "$predictions_file" >> "$temp_file"
+
+        # Replace original with rotated file
+        mv "$temp_file" "$predictions_file"
+
+        # Log the rotation
+        echo "Predictions file rotated at $(TZ="America/New_York" date "+%Y-%m-%d %H:%M:%S %Z")"
+        echo "Current predictions file size: $(wc -l < "$predictions_file") lines"
+    fi
+}
+
+# Function to archive old predictions
+archive_predictions() {
+    local predictions_file="/usr/bin/code/testpredictions/predictions.csv"
+    local archive_dir="/usr/bin/code/testpredictions/archives"
+    local current_date=$(date +"%Y%m")
+
+    # Create archives directory if it doesn't exist
+    mkdir -p "$archive_dir"
+
+    # If it's the first day of the month and predictions file exists
+    if [ "$(date +%d)" = "01" ] && [ -f "$predictions_file" ]; then
+        # Create monthly archive
+        local archive_file="$archive_dir/predictions_${current_date}.csv"
+        if [ ! -f "$archive_file" ]; then
+            cp "$predictions_file" "$archive_file"
+            # Compress the archive
+            gzip "$archive_file"
+            # Upload archive to S3
+            /usr/local/bin/aws s3 cp "${archive_file}.gz" "s3://rise-collab/archives/"
+            echo "Monthly archive created: ${archive_file}.gz"
+            # Clear the predictions file but keep the header
+            head -n 1 "$predictions_file" > "$predictions_file.tmp"
+            mv "$predictions_file.tmp" "$predictions_file"
+        fi
+    fi
+}
+
+# Check that $DOWNLOAD_DIR is not empty and it points to a valid directory
+
+if [ -z "$DOWNLOAD_DIR" ]; then
+    echo "Error: DOWNLOAD_DIR is not set."
+    exit 1
+elif [ ! -d "$DOWNLOAD_DIR" ]; then
+    echo "DOWNLOAD_DIR does not exist. Creating the directory..."
+    mkdir -p "$DOWNLOAD_DIR"
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to create DOWNLOAD_DIR."
+        exit 1
+    fi
+fi
+
+# Clean up download directory by removing all files
+rm -rf "$DOWNLOAD_DIR"/*
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to clean up DOWNLOAD_DIR."
+    exit 1
+fi
+
+# Get list of all objects with their LastModified timestamps
+echo "Fetching S3 objects..."
+all_objects=$(/usr/local/bin/aws s3api list-objects-v2 \
+    --bucket $BUCKET_NAME \
+    --prefix $PREFIX \
+    --query 'Contents[].{Key: Key, LastModified: LastModified}' \
+    --output json)
+
+# Get the most recent file (sorting by LastModified timestamp)
+latest_file_info=$(echo "$all_objects" | jq -r 'sort_by(.LastModified)[-1]')
+
+# Extract the key and last modified timestamp
+key=$(echo "$latest_file_info" | jq -r '.Key')
+s3_timestamp_utc=$(echo "$latest_file_info" | jq -r '.LastModified')
+
+# Convert timestamps to EST
+s3_timestamp_est=$(convert_to_est "$s3_timestamp_utc")
+current_time_est=$(TZ="America/New_York" date "+%Y-%m-%d %H:%M:%S %Z")
+
+echo "============== Latest File Information =============="
+echo "File: $key"
+echo "Upload Time (EST): $s3_timestamp_est"
+echo "Current Time (EST): $current_time_est"
+echo "==============================================="
+
+# Check if the key was retrieved and is valid
+if [ -z "$key" ] || [ "$key" == "null" ]; then
+    echo "Error: No valid key found."
+    exit 1
+fi
+
+# Download only the latest file to the download directory
+echo "Downloading latest file: $key"
+/usr/local/bin/aws s3 cp "s3://$BUCKET_NAME/$key" "$DOWNLOAD_DIR/"
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to download the latest file from S3."
+    exit 1
+fi
+
+# Verify only one file was downloaded
+file_count=$(ls -1 "$DOWNLOAD_DIR" | wc -l)
+echo "Number of files in download directory: $file_count"
+if [ "$file_count" -ne 1 ]; then
+    echo "Warning: Unexpected number of files in download directory"
+    ls -l "$DOWNLOAD_DIR"
+    exit 1
+fi
+
+# Create a timestamp log
+timestamp_log="$DOWNLOAD_DIR/timestamp_log.txt"
+echo "File: $(basename $key)" > "$timestamp_log"
+echo "Upload Time (EST): $s3_timestamp_est" >> "$timestamp_log"
+echo "Processing Time (EST): $current_time_est" >> "$timestamp_log"
+
+# Log the downloaded file info
+echo "$DOWNLOAD_DIR/$(basename $key) $s3_timestamp_est $current_time_est" > /usr/bin/code/files_to_download.txt
+
+# Save the timestamp
+echo "$s3_timestamp_utc" > "$LAST_TIMESTAMP_FILE"
+
+echo "Latest file downloaded successfully: $key"
+
+# Run the Python script for inference
+echo "Starting inference..."
+python /usr/bin/code/infer.py --input_img_size 600 \
+    --model_path /usr/bin/code/model/* \
+    --image_path "$DOWNLOAD_DIR"
+
+# Log completion time
+completion_time_est=$(TZ="America/New_York" date "+%Y-%m-%d %H:%M:%S %Z")
+echo "Inference Completion Time (EST): $completion_time_est" >> "$timestamp_log"
+
+# Manage predictions file before appending new data
+manage_predictions_file
+
+# Append new predictions to predictions.csv
+if [ -f "/usr/bin/code/inference_predictions.csv" ]; then
+    tail -n +2 /usr/bin/code/inference_predictions.csv >> /usr/bin/code/testpredictions/predictions.csv
+else
+    echo "Warning: inference_predictions.csv not found"
+fi
+
+# Archive predictions if needed
+archive_predictions
+
+# Copy predictions to s3
+/usr/local/bin/aws s3 cp /usr/bin/code/testpredictions/predictions.csv s3://rise-collab/
+
+# Log file sizes
+echo "============== File Size Information =============="
+echo "Current predictions file size: $(wc -l <  /usr/bin/code/testpredictions/predictions.csv) lines"
+echo "Current predictions file size (bytes): $(ls -lh /usr/bin/code/testpredictions/predictions.csv | awk '{print $5}')"
+echo "==============================================="
+
+echo "============== Process Complete =============="
+echo "Final completion time (EST): $completion_time_est"
+echo "Processed file: $key"
+echo "==========================================="
+
+# Check if everything worked
+if [ $? -eq 0 ]; then
+    echo "Script executed successfully at: $completion_time_est (EST)"
+    # Clean up downloaded files if needed
+    rm -rf "$DOWNLOAD_DIR"/*
+else
+    echo "Script encountered an error at: $completion_time_est (EST)"
+    exit 1
+fi

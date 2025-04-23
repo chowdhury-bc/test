@@ -1,0 +1,238 @@
+import json
+import boto3
+import time
+
+def lambda_handler(event, context):
+    """
+    Lambda function to serve as a tool for Bedrock multiagent MCP
+    """
+    print(f"Received event: {json.dumps(event)}")
+    
+    # Determine the action type from the event
+    action_type = event.get('action', 'unknown')
+    
+    if action_type == 'lookupAccount':
+        # Get customer ID from event
+        customer_id = event.get('customerId', 'unknown')
+        request = event.get('request', '')
+        
+        # Simulate account lookup
+        # In a real implementation, you would query a database
+        account_info = simulate_account_lookup(customer_id, request)
+        return account_info
+        
+    elif action_type == 'getProductInfo':
+        # Get product ID from event
+        product_id = event.get('productId', 'unknown')
+        
+        # Simulate product info lookup
+        product_info = simulate_product_lookup(product_id)
+        return product_info
+        
+    elif action_type == 'logTicket':
+        # Get ticket details from event
+        customer_id = event.get('customerId', 'unknown')
+        issue = event.get('issue', '')
+        
+        # Simulate ticket creation
+        ticket_info = simulate_ticket_creation(customer_id, issue)
+        return ticket_info
+        
+    else:
+        return {
+            'error': f"Unknown action type: {action_type}",
+            'supportedActions': ['lookupAccount', 'getProductInfo', 'logTicket']
+        }
+
+def simulate_account_lookup(customer_id, request):
+    """Simulate looking up customer account information"""
+    # Add a small delay to simulate database query
+    time.sleep(0.5)
+    
+    # Return mock account data
+    return {
+        'accountId': customer_id,
+        'status': 'Active',
+        'plan': 'Premium',
+        'billingCycle': 'Monthly',
+        'nextBillingDate': '2025-05-01',
+        'paymentMethod': 'Credit Card (ending in 1234)',
+        'requestContext': request
+    }
+
+def simulate_product_lookup(product_id):
+    """Simulate looking up product information"""
+    # Add a small delay to simulate database query
+    time.sleep(0.5)
+    
+    # Mock product catalog
+    products = {
+        'basic': {
+            'name': 'Basic Plan',
+            'price': '$9.99/month',
+            'features': ['5 GB storage', 'Basic API access', 'Email support']
+        },
+        'premium': {
+            'name': 'Premium Plan',
+            'price': '$29.99/month',
+            'features': ['50 GB storage', 'Advanced API access', 'Priority support', 'Custom integrations']
+        },
+        'enterprise': {
+            'name': 'Enterprise Plan',
+            'price': 'Contact sales',
+            'features': ['Unlimited storage', 'Dedicated support', 'SLA guarantees', 'Custom development']
+        }
+    }
+    
+    # Return product info if it exists
+    if product_id.lower() in products:
+        return products[product_id.lower()]
+    else:
+        return {
+            'error': f"Product '{product_id}' not found",
+            'availableProducts': list(products.keys())
+        }
+
+def simulate_ticket_creation(customer_id, issue):
+    """Simulate creating a support ticket"""
+    # Add a small delay to simulate ticket creation
+    time.sleep(0.5)
+    
+    # Generate a ticket ID
+    ticket_id = f"TICKET-{int(time.time())}"
+    
+    return {
+        'ticketId': ticket_id,
+        'customerId': customer_id,
+        'status': 'Created',
+        'priority': 'Medium',
+        'assignedTo': 'Support Team',
+        'estimatedResponse': '24 hours',
+        'issue': issue
+    }
+
+
+
+
+
+    =================================
+
+
+    {
+  "name": "CustomerSupportAgent",
+  "description": "A multiagent system that handles customer support requests",
+  "flowNodes": [
+    {
+      "name": "RequestClassifier",
+      "type": "action",
+      "model": {
+        "modelId": "anthropic.claude-3-sonnet-20240229-v1:0",
+        "inferenceConfig": {
+          "temperature": 0.2,
+          "maxTokens": 4096
+        }
+      },
+      "action": {
+        "type": "prompt",
+        "prompt": {
+          "template": "Classify the customer request into one of the following categories:\n1. Technical Support\n2. Billing Inquiry\n3. Product Information\n4. Other\n\nCustomer request: {{customerRequest}}\n\nClassification:"
+        }
+      },
+      "outputs": [
+        {"name": "categoryOutput", "type": "string"}
+      ]
+    },
+    {
+      "name": "AccountAPI",
+      "type": "action",
+      "condition": "{{RequestClassifier.categoryOutput}} == 'Billing Inquiry'",
+      "action": {
+        "type": "lambda",
+        "lambda": {
+          "functionArn": "YOUR_LAMBDA_ARN",
+          "invocationPayload": {
+            "action": "lookupAccount",
+            "customerId": "{{customerId}}",
+            "request": "{{customerRequest}}"
+          }
+        }
+      },
+      "outputs": [
+        {"name": "accountInfo", "type": "string"}
+      ]
+    },
+    {
+      "name": "ProductAPI",
+      "type": "action",
+      "condition": "{{RequestClassifier.categoryOutput}} == 'Product Information'",
+      "action": {
+        "type": "lambda",
+        "lambda": {
+          "functionArn": "YOUR_LAMBDA_ARN",
+          "invocationPayload": {
+            "action": "getProductInfo",
+            "productId": "premium"
+          }
+        }
+      },
+      "outputs": [
+        {"name": "productInfo", "type": "string"}
+      ]
+    },
+    {
+      "name": "ResponseGenerator",
+      "type": "action",
+      "model": {
+        "modelId": "anthropic.claude-3-sonnet-20240229-v1:0",
+        "inferenceConfig": {
+          "temperature": 0.5,
+          "maxTokens": 4096
+        }
+      },
+      "action": {
+        "type": "prompt",
+        "prompt": {
+          "template": "Generate a comprehensive response to the customer based on their request and any additional information.\n\nCustomer request: {{customerRequest}}\nRequest category: {{RequestClassifier.categoryOutput}}\nAccount information (if available): {{AccountAPI.accountInfo}}\nProduct information (if available): {{ProductAPI.productInfo}}\n\nGenerate a professional, helpful response that addresses the customer's needs:"
+        }
+      },
+      "outputs": [
+        {"name": "finalResponse", "type": "string"}
+      ]
+    }
+  ],
+  "outputs": [
+    {"name": "finalResponse", "source": "ResponseGenerator.finalResponse", "type": "string"},
+    {"name": "category", "source": "RequestClassifier.categoryOutput", "type": "string"}
+  ]
+}
+
+
+
+
+
+=================================
+
+
+Technical Support Issue:
+json{
+  "customerRequest": "My application is failing to connect to your API. I keep getting timeout errors.",
+  "customerId": "CUST123456"
+}
+
+Billing Inquiry:
+json{
+  "customerRequest": "I was charged twice on my last invoice. Can you help me understand why?",
+  "customerId": "CUST789012"
+}
+
+Product Information:
+json{
+  "customerRequest": "What features do I get with the premium plan?",
+  "customerId": "CUST345678"
+}
+
+General Inquiry:
+json{
+  "customerRequest": "What are your support hours?",
+  "customerId": "CUST901234"
+}

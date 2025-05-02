@@ -1,133 +1,37 @@
-import boto3
-import json
-import uuid
-import time
+Starting MCP Demo with AWS Bedrock
+Created two conversations: 7605b465-6c58-46ea-aaa7-3736fd44b7ae (Tech) and 0b4130d6-a682-4195-a5db-8777c8fec8b4 (Shakespeare)
 
-class MCPDemo:
-    def __init__(self, model_id="anthropic.claude-3-sonnet-20240229-v1:0", region_name="us-east-1"):
-        """Initialize the MCP Demo with the specified model and region."""
-        self.bedrock_runtime = boto3.client('bedrock-runtime', region_name=region_name)
-        self.model_id = model_id
-        self.conversations = {}  # Store conversation histories
+--- Tech Conversation ---
+User: What are the main benefits of serverless architecture?
+Assistant: Serverless architecture, also known as Function as a Service (FaaS), offers several benefits over traditional server-based architectures. The main advantages of serverless architecture are:
 
-    def create_conversation(self, system_prompt=None):
-        """Create a new conversation with an optional system prompt."""
-        conversation_id = str(uuid.uuid4())
-        self.conversations[conversation_id] = {
-            "messages": [],
-            "system_prompt": system_prompt or "You are a helpful assistant."
-        }
-        return conversation_id
-
-    def add_message(self, conversation_id, role, content):
-        """Add a message to an existing conversation."""
-        if conversation_id not in self.conversations:
-            raise ValueError(f"Conversation {conversation_id} does not exist.")
-        
-        self.conversations[conversation_id]["messages"].append({
-            "role": role,
-            "content": content
-        })
-
-    def generate_response(self, conversation_id):
-        """Generate a response from the model based on conversation history."""
-        if conversation_id not in self.conversations:
-            raise ValueError(f"Conversation {conversation_id} does not exist.")
-        
-        conversation = self.conversations[conversation_id]
-        
-        # Format the request according to Bedrock's Claude API
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 1000,
-            "system": conversation["system_prompt"],
-            "messages": conversation["messages"]
-        }
-        
-        # Invoke the model
-        response = self.bedrock_runtime.invoke_model(
-            modelId=self.model_id,
-            body=json.dumps(request_body)
-        )
-        
-        # Parse the response
-        response_body = json.loads(response['body'].read().decode('utf-8'))
-        
-        # Add the assistant's response to the conversation history
-        self.add_message(
-            conversation_id,
-            "assistant",
-            response_body["content"][0]["text"]
-        )
-        
-        return response_body["content"][0]["text"]
-
-    def list_conversations(self):
-        """List all conversation IDs."""
-        return list(self.conversations.keys())
-
-    def get_conversation_history(self, conversation_id):
-        """Get the full history of a conversation."""
-        if conversation_id not in self.conversations:
-            raise ValueError(f"Conversation {conversation_id} does not exist.")
-        
-        return self.conversations[conversation_id]["messages"]
+1. No ser...
 
 
-def run_demo():
-    """Run a simple interactive demo of the MCP system."""
-    print("Starting MCP Demo with AWS Bedrock")
-    
-    # Make sure to use a region where Bedrock is available
-    mcp = MCPDemo(region_name="us-east-1")  # Change to your required region
-    
-    # Create two separate conversations
-    conv1_id = mcp.create_conversation("You are a helpful AI assistant focused on technology.")
-    conv2_id = mcp.create_conversation("You are a creative writing assistant who speaks like Shakespeare.")
-    
-    print(f"Created two conversations: {conv1_id} (Tech) and {conv2_id} (Shakespeare)")
-    
-    # Demonstrate conversation 1 (Tech)
-    print("\n--- Tech Conversation ---")
-    tech_query = "What are the main benefits of serverless architecture?"
-    print(f"User: {tech_query}")
-    
-    mcp.add_message(conv1_id, "user", tech_query)
-    response = mcp.generate_response(conv1_id)
-    
-    print(f"Assistant: {response[:200]}...\n")
-    
-    # Demonstrate conversation 2 (Shakespeare)
-    print("\n--- Shakespeare Conversation ---")
-    shakespeare_query = "Tell me about cloud computing."
-    print(f"User: {shakespeare_query}")
-    
-    mcp.add_message(conv2_id, "user", shakespeare_query)
-    response = mcp.generate_response(conv2_id)
-    
-    print(f"Assistant: {response[:200]}...\n")
-    
-    # Continue conversation 1 with follow-up
-    print("\n--- Tech Conversation (continued) ---")
-    tech_followup = "How does it compare to container-based solutions?"
-    print(f"User: {tech_followup}")
-    
-    mcp.add_message(conv1_id, "user", tech_followup)
-    response = mcp.generate_response(conv1_id)
-    
-    print(f"Assistant: {response[:200]}...\n")
-    
-    # Show the conversation histories
-    print("\n--- Conversation Histories ---")
-    
-    print("\nTech Conversation History:")
-    for msg in mcp.get_conversation_history(conv1_id):
-        print(f"{msg['role'].capitalize()}: {msg['content'][:100]}...")
-    
-    print("\nShakespeare Conversation History:")
-    for msg in mcp.get_conversation_history(conv2_id):
-        print(f"{msg['role'].capitalize()}: {msg['content'][:100]}...")
+--- Shakespeare Conversation ---
+User: Tell me about cloud computing.
+Assistant: *clouds cover the sky, as vast and formless as the billowed sheets upon the line*
+
+Verily, 'tis a marvel of our modern age, this "cloud computing" of which thou speak'st! A cunning means by which vast...
 
 
-if __name__ == "__main__":
-    run_demo()
+--- Tech Conversation (continued) ---
+User: How does it compare to container-based solutions?
+Assistant: When comparing serverless architecture to container-based solutions like Docker and Kubernetes, there are several key differences:
+
+1. Abstraction level: Serverless functions operate at a higher abstr...
+
+
+--- Conversation Histories ---
+
+Tech Conversation History:
+User: What are the main benefits of serverless architecture?...
+Assistant: Serverless architecture, also known as Function as a Service (FaaS), offers several benefits over tr...
+User: How does it compare to container-based solutions?...
+Assistant: When comparing serverless architecture to container-based solutions like Docker and Kubernetes, ther...
+
+Shakespeare Conversation History:
+User: Tell me about cloud computing....
+Assistant: *clouds cover the sky, as vast and formless as the billowed sheets upon the line*
+
+Verily, 'tis a ma...

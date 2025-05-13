@@ -1,9 +1,44 @@
-Starting inference with Python: Python 3.9.21
-Traceback (most recent call last):
-  File "/usr/bin/code/infer.py", line 11, in <module>
-    import torch
-  File "/usr/local/lib64/python3.11/site-packages/torch/__init__.py", line 237, in <module>
-    from torch._C import *  # noqa: F403
-    ^^^^^^^^^^^^^^^^^^^^^^
-ImportError: libcudnn.so.8: cannot open shared object file: No such file or directory
-Error: Python inference script failed.
+| Layer                                               | **Bedrock KB + Amazon Kendra (Gen‑AI index)**                                                                            | **Bedrock KB + Amazon OpenSearch Serverless (AOSS)**                                                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|  Retrieval service cost model                       | Pay **per hour** for <br>• Index capacity (“storage units”)<br>• Query capacity (“query units”)<br>• Optional connectors | Pay **per second** for <br>• Compute (OpenSearch Compute Units – OCUs) that auto‑scale for **indexing & search**<br>• Managed vector storage (per GB‑month) |
+|  Idle “floor” (smallest bill if the KB just exists) | 1 Base Index (Gen‑AI edition) \$0.32 /hr ⇒ ≈ \$230 / mo                                                                  | Minimum 2 OCUs (0.5 index + 0.5 search × HA) \$0.48 /hr ⇒ ≈ \$346 / mo                                                                                      |
+|  Includes                                           |  • Vector + semantic search & re‑ranking built‑in<br>• 20 k docs / 200 MB extracted text <br>• ≈ 8 k queries day‑1       |  • Vector search only (bring your own reranker – e.g., Bedrock Rerank @ \$0.001 per query) <br>• No hard doc/qps caps; OCUs scale                           |
+|  Scaling knobs                                      | Add storage units (\$0.25 /hr each) and query units (\$0.07 /hr each)                                                    | OCUs elastically scale in 1‑OCU steps (\$0.24 /hr/OCU in us‑east‑1)                                                                                         |
+|  Connector / ingest extras                          | \$30 per index mo. for each connector                                                                                    | None (pull documents straight from S3; Bedrock handles chunk/embed)                                                                                         |
+|  KB (Bedrock) surcharge                             | **None** – Bedrock KB itself is free; you only pay vector store + model calls ([Repost][1])                              |                                                                                                                                                             |
+
+[1]: https://repost.aws/questions/QUzV7T0_gXRZSsnAtg1JGx3Q/pricing-for-aws-bedrock-knowledge-bases?utm_source=chatgpt.com "Pricing for AWS Bedrock knowledge bases"
+
+
+| Example workload                                                     | Kendra ₍Gen‑AI₎                                                                               | AOSS                                                                                                 |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Low‑volume PoC** 10 k docs, 2 k queries day‑1                      | 1 Base Index ⇒ **≈ \$230/mo**                                                                 | Min 2 OCUs ⇒ **≈ \$346/mo** (AOSS is **more expensive** when lightly used)                           |
+| **Mid‑scale KB** 50 k docs, 10 GB text, 10 k queries day‑1           | 1 Base + 1 Storage + 1 Query unit <br>(0.32 + 0.25 + 0.07 \$/hr) + connector ⇒ **≈ \$491/mo** | Still fits in 2 OCUs (0.48 \$/hr) + \$0.24 storage mo ⇒ **≈ \$346 /mo** (AOSS now **cheaper**)       |
+| **Burst‑heavy** 2 M queries on one launch day, mostly idle otherwise | You must pre‑provision enough query units for the peak & pay 24 × 30 h even when idle         | OCUs scale out only while the spike lasts; you pay by the second, so **AOSS usually wins on bursts** |
+
+
+
+
+Key cost drivers & trade‑offs
+Pricing granularity
+Kendra bills the whole hour for every index/query unit that exists. Deleting the index stops charges but recreating incurs a new (costly) re‑index.
+AOSS bills per‑second OCU usage and can down‑scale to its floor automatically, so short spikes or overnight idle time cost less.
+
+Feature depth vs. add‑ons
+Kendra Gen‑AI bundles semantic ranking, dense–sparse hybrid search, ACL‑aware filtering, and incremental crawler/connector jobs. Cost is higher per GB, but you rarely need Bedrock Rerank.
+AOSS provides raw vector search. If you want the same “top‑K re‑rank” quality you’ll typically add Bedrock Rerank at $0.001 / query ≤ 100 docs , which can narrow the price gap for very chatty apps.
+
+Storage economics
+Kendra charges by “extracted text” ‑ you pay full storage‑unit price whether the extra 200 MB is used or not.
+AOSS charges $0.024 / GB‑month , so it becomes dramatically cheaper as soon as you exceed ~10 GB of embeddings per storage unit that Kendra would bill at $180 / mo.
+
+Operational effort
+Kendra = zero‑tuning; automatic synonym expansion, relevance tuning UI, security via IAM or document‑level ACLs.
+AOSS = full OpenSearch APIs; you manage embeddings dimensions, index parameter settings, index lifecycle policies, etc. That flexibility lets you swap K‑NN engine, sharding strategy, or bring‑your‑own transforms, but costs you engineering time.
+
+Rule‑of‑thumb decision
+If you value	Lean toward
+Turn‑key semantic search, many data connectors, smaller datasets, predictable steady traffic	Bedrock KB + Kendra Gen‑AI
+Large corpora (>40–50 GB), spiky or unpredictable traffic, or need low‑level vector/index control	Bedrock KB + OpenSearch Serverless
+
+Remember: whichever store you pick, you’ll still incur the model‑inference cost for the LLM that grounds the answer. That spend is identical in both architectures, so the choice really comes down to retrieval‑layer economics and operational preferences.

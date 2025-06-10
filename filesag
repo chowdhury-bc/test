@@ -1,0 +1,120 @@
+import json
+import requests
+from typing import Dict, Any
+import os
+
+def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
+    """
+    Lambda function to perform web search for Bedrock Agent
+    """
+    try:
+        # Extract parameters from Bedrock Agent
+        agent_input = event.get('inputText', '')
+        parameters = event.get('parameters', [])
+        
+        # Extract search query from parameters
+        search_query = None
+        for param in parameters:
+            if param.get('name') == 'query':
+                search_query = param.get('value')
+                break
+        
+        if not search_query:
+            return {
+                'response': {
+                    'actionResponse': {
+                        'actionResponseBody': {
+                            'TEXT': {
+                                'body': 'No search query provided'
+                            }
+                        }
+                    }
+                }
+            }
+        
+        # Perform web search (example using SerpAPI - you can use other providers)
+        search_results = perform_web_search(search_query)
+        
+        # Format response for Bedrock Agent
+        response_text = format_search_results(search_results)
+        
+        return {
+            'response': {
+                'actionResponse': {
+                    'actionResponseBody': {
+                        'TEXT': {
+                            'body': response_text
+                        }
+                    }
+                }
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error in lambda_handler: {str(e)}")
+        return {
+            'response': {
+                'actionResponse': {
+                    'actionResponseBody': {
+                        'TEXT': {
+                            'body': f'Error performing web search: {str(e)}'
+                        }
+                    }
+                }
+            }
+        }
+
+def perform_web_search(query: str) -> Dict[str, Any]:
+    """
+    Perform web search using SerpAPI (replace with your preferred search API)
+    """
+    api_key = os.environ.get('SERPAPI_KEY')
+    
+    if not api_key:
+        # Fallback to a simple search simulation
+        return {
+            'organic_results': [
+                {
+                    'title': f'Search result for: {query}',
+                    'link': 'https://example.com',
+                    'snippet': f'This is a sample search result for the query: {query}'
+                }
+            ]
+        }
+    
+    url = "https://serpapi.com/search.json"
+    params = {
+        'q': query,
+        'api_key': api_key,
+        'num': 5  # Number of results
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Search API error: {str(e)}")
+        return {'organic_results': []}
+
+def format_search_results(search_data: Dict[str, Any]) -> str:
+    """
+    Format search results into a readable string for the agent
+    """
+    results = search_data.get('organic_results', [])
+    
+    if not results:
+        return "No search results found."
+    
+    formatted_results = "Here are the search results:\n\n"
+    
+    for i, result in enumerate(results[:5], 1):  # Limit to top 5 results
+        title = result.get('title', 'No title')
+        link = result.get('link', '')
+        snippet = result.get('snippet', 'No description available')
+        
+        formatted_results += f"{i}. **{title}**\n"
+        formatted_results += f"   URL: {link}\n"
+        formatted_results += f"   Description: {snippet}\n\n"
+    
+    return formatted_results
